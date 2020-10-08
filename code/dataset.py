@@ -244,6 +244,8 @@ class TotalDatasetsLoader(data.Dataset):
                 c2 = np.random.randint(0, n_classes)
                 while c1 == c2:
                     c2 = np.random.randint(0, n_classes)
+                print (" c1 is " + c1)
+                print (" n_classes is " + n_classes)
                 if len(indices[c1]) == 2:  # hack to speed up process
                     n1, n2 = 0, 1
                 else:
@@ -341,6 +343,7 @@ class TripletPhotoTour(dset.PhotoTour):
         def create_indices(_labels):
             inds = dict()
             for idx, ind in enumerate(_labels):
+                ind = ind.item()
                 if ind not in inds:
                     inds[ind] = []
                 inds[ind].append(idx)

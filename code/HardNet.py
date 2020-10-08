@@ -311,7 +311,8 @@ class HardNet(nn.Module):
             nn.Conv2d(128, 128, kernel_size=8, bias = False),
             nn.BatchNorm2d(128, affine=False),
         )
-        self.features.apply(weights_init)
+        print ("----SKIPPING INITIALILZATION----")
+        #self.features.apply(weights_init)
         return
     
     def input_norm(self,x):
@@ -545,8 +546,8 @@ def main(train_loader, test_loaders, model, logger, file_logger):
 
         # iterate over test loaders and test results
         train(train_loader, model, optimizer1, epoch, logger, triplet_flag)
-        for test_loader in test_loaders:
-            test(test_loader['dataloader'], model, epoch, logger, test_loader['name'])
+        #for test_loader in test_loaders:
+            #test(test_loader['dataloader'], model, epoch, logger, test_loader['name'])
         
         if TEST_ON_W1BS :
             # print(weights_path)
