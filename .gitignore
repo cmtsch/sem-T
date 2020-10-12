@@ -1,5 +1,8 @@
 # Data with which hardnet works
 data/
+examples/
+lsf*
+.txt
 
 
 # Other hardnet generated files
