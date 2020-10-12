@@ -96,7 +96,7 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('--epochs', type=int, default=10, metavar='E',
+parser.add_argument('--epochs', type=int, default=1, metavar='E',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--anchorswap', type=str2bool, default=True,
                     help='turns on anchor swap')
@@ -311,8 +311,7 @@ class HardNet(nn.Module):
             nn.Conv2d(128, 128, kernel_size=8, bias = False),
             nn.BatchNorm2d(128, affine=False),
         )
-        print ("----SKIPPING INITIALILZATION----")
-        #self.features.apply(weights_init)
+        self.features.apply(weights_init)
         return
     
     def input_norm(self,x):
