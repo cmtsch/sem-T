@@ -96,7 +96,7 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('--epochs', type=int, default=1, metavar='E',
+parser.add_argument('--epochs', type=int, default=2, metavar='E',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--anchorswap', type=str2bool, default=True,
                     help='turns on anchor swap')
@@ -545,8 +545,8 @@ def main(train_loader, test_loaders, model, logger, file_logger):
 
         # iterate over test loaders and test results
         train(train_loader, model, optimizer1, epoch, logger, triplet_flag)
-        #for test_loader in test_loaders:
-            #test(test_loader['dataloader'], model, epoch, logger, test_loader['name'])
+        for test_loader in test_loaders:
+            test(test_loader['dataloader'], model, epoch, logger, test_loader['name'])
         
         if TEST_ON_W1BS :
             # print(weights_path)
