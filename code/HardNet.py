@@ -34,7 +34,7 @@ import cv2
 import copy
 import PIL
 from EvalMetrics import ErrorRateAt95Recall
-from Losses import loss_HardNet, loss_random_sampling, loss_L2Net, global_orthogonal_regularization
+from Losses import loss_HardNet, loss_random_sampling, loss_L2Net, global_orthogonal_regularization, loss_SOS
 from W1BS import w1bs_extract_descs_and_save
 from Utils import L2Norm, cv2_scale, np_reshape
 from Utils import str2bool
@@ -135,6 +135,8 @@ parser.add_argument('--seed', type=int, default=0, metavar='S',
                     help='random seed (default: 0)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='LI',
                     help='how many batches to wait before logging training status')
+parser.add_argument('--lossSOS', type=bool, default=True, metavar='SOS',
+                    help='use the Second Order Similarity loss')
 
 args = parser.parse_args()
 
@@ -422,6 +424,10 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
                             anchor_ave=args.anchorave,
                             batch_reduce = args.batch_reduce,
                             loss_type = args.loss)
+        
+        if args.lossSOS:
+            print ("Adding SOS loss")
+            loss += loss_SOS(out_a, out_p)
 
         if args.decor:
             loss += CorrelationPenaltyLoss()(out_a)
