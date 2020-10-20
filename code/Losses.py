@@ -157,13 +157,14 @@ def loss_HardNet(anchor, positive, anchor_swap = False, anchor_ave = False,\
 def chrisTest():
     anchors = torch.randn(5,3)
     positives = torch.randn(5,3)
-    print(anchors)
-    print(positives)
+    #print(anchors)
+    #print(positives)
     print(loss_SOS(anchors, positives))
 
 def partition_assign(a, n):
-    idx = np.argpartition(a,-n,axis=1)[:,-n:]
+    idx = np.argpartition(a,-n,axis=1)[:,:n]
     out = np.zeros(a.shape, dtype=int)
+    idx = idx.numpy()
     np.put_along_axis(out,idx,1,axis=1)
     return out
 
@@ -180,17 +181,17 @@ def loss_SOS (anchor, positive, use_KnearestNeighbors = True, k = 2):
     # Calculate the L2 norm
     dist_matrix_anchors = distance_matrix_vector(anchor, anchor)
     dist_matrix_positives = distance_matrix_vector(positive, positive)
-    #print (dist_matrix_positives)
+    #print (dist_matrix_anchors)
 
     
     # Construct two masks: which correspond to the k-nearest neightbors: mask_anchor/positive
     # The total mask is then mask_total = mask_anchor v mask_positive
   
-    mask_anchor = torch.randint(0,2,[Nbatch,Nbatch])
-    mask_positive = torch.randint(0,2,[Nbatch,Nbatch])
+    #mask_anchor = torch.randint(0,2,[Nbatch,Nbatch])
+    #mask_positive = torch.randint(0,2,[Nbatch,Nbatch])
     
-    #mask_anchor = partition_assign (dist_matrix_anchors, k)
-    #mask_positive = partition_assign (dist_matrix_positives, k)
+    mask_anchor = partition_assign (dist_matrix_anchors, k)
+    mask_positive = partition_assign (dist_matrix_positives, k)
 
     #logical_or function not in torch 1.4.0
     #mask_total = torch.logical_or(mask_anchor, mask_positive)
@@ -198,6 +199,8 @@ def loss_SOS (anchor, positive, use_KnearestNeighbors = True, k = 2):
     #dummy or function
     mask_total = mask_anchor + mask_positive
     mask_total = mask_total >= 1
+    mask_total = torch.from_numpy(mask_total)
+    mask_total.cuda()
 
     helper = dist_matrix_anchors * mask_total - dist_matrix_positives * mask_total
 
