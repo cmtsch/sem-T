@@ -180,44 +180,27 @@ def loss_SOS (anchor, positive, use_KnearestNeighbors = True, k = 2):
     # Calculate the L2 norm
     dist_matrix_anchors = distance_matrix_vector(anchor, anchor)
     dist_matrix_positives = distance_matrix_vector(positive, positive)
-    #print (dist_matrix_anchors)
-    #numNans = torch.sum(dist_matrix_anchors!=dist_matrix_anchors)
-    #print ("number of Nans in distAnchor is " + str(numNans) ) 
-    #numNans = torch.sum(dist_matrix_positives!=dist_matrix_positives)
-    #print ("number of Nans in distPos is " + str(numNans) ) 
 
     # Construct two masks: which correspond to the k-nearest neightbors: mask_anchor/positive
     # The total mask is then mask_total = mask_anchor v mask_positive
   
-    #mask_anchor = torch.randint(0,2,[Nbatch,Nbatch])
-    #mask_positive = torch.randint(0,2,[Nbatch,Nbatch])
     
     mask_anchor = partition_assign (dist_matrix_anchors.detach().cpu().numpy(), k)
     mask_positive = partition_assign (dist_matrix_positives.detach().cpu().numpy(), k)
 
     #logical_or function not in torch 1.4.0
     #mask_total = torch.logical_or(mask_anchor, mask_positive)
-
     #dummy or function
     mask_total = mask_anchor + mask_positive
     mask_total = (mask_total >= 1).astype(int) 
     mask_total = torch.from_numpy(mask_total)
 
     mask_total = mask_total.cuda()
-    #print (mask_total)
-    #print (dist_matrix_anchors)
-    #print (dist_matrix_positives)
 
     helper = dist_matrix_anchors * mask_total - dist_matrix_positives * mask_total
-    #numNans = torch.sum(helper!=helper)
-    #print ("number of Nans in helper is " + str(numNans) ) 
 
-    # take norm of each row, take average
     loss = torch.norm(helper,  dim = 1)
-    #numNans = torch.sum(loss!=loss)
-    #print ("number of Nans in vector is " + str(numNans) ) 
     loss = torch.mean(loss)
-    #print (loss)
     return loss
 
 def global_orthogonal_regularization(anchor, negative):
