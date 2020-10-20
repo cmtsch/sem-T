@@ -9,7 +9,7 @@ def distance_matrix_vector(anchor, positive):
     d1_sq = torch.sum(anchor * anchor, dim=1).unsqueeze(-1)
     d2_sq = torch.sum(positive * positive, dim=1).unsqueeze(-1)
 
-    eps = 1e-6
+    eps = 1e-5
     return torch.sqrt((d1_sq.repeat(1, positive.size(0)) + torch.t(d2_sq.repeat(1, anchor.size(0)))
                       - 2.0 * torch.bmm(anchor.unsqueeze(0), torch.t(positive).unsqueeze(0)).squeeze(0))+eps)
 
@@ -157,14 +157,13 @@ def loss_HardNet(anchor, positive, anchor_swap = False, anchor_ave = False,\
 def chrisTest():
     anchors = torch.randn(5,3)
     positives = torch.randn(5,3)
-    #print(anchors)
-    #print(positives)
     print(loss_SOS(anchors, positives))
+
 
 def partition_assign(a, n):
     idx = np.argpartition(a,-n,axis=1)[:,:n]
     out = np.zeros(a.shape, dtype=int)
-    idx = idx.numpy()
+    #idx = idx.cpu().numpy()
     np.put_along_axis(out,idx,1,axis=1)
     return out
 
@@ -173,8 +172,8 @@ def loss_SOS (anchor, positive, use_KnearestNeighbors = True, k = 2):
     # the anchors and the positives should have a similar distance
 
     Nbatch, dimensions = anchor.size()
-    print ("Dimensions of desriptor is " + str(dimensions))
-    print ("Number in batch is " + str(Nbatch))
+    #print ("Dimensions of desriptor is " + str(dimensions))
+    #print ("Number in batch is " + str(Nbatch))
 
     # first we need to get a NxN (batch size) distance matrix for the anchors and the positives
     # dist_anchors and dist_positives
@@ -182,31 +181,43 @@ def loss_SOS (anchor, positive, use_KnearestNeighbors = True, k = 2):
     dist_matrix_anchors = distance_matrix_vector(anchor, anchor)
     dist_matrix_positives = distance_matrix_vector(positive, positive)
     #print (dist_matrix_anchors)
+    #numNans = torch.sum(dist_matrix_anchors!=dist_matrix_anchors)
+    #print ("number of Nans in distAnchor is " + str(numNans) ) 
+    #numNans = torch.sum(dist_matrix_positives!=dist_matrix_positives)
+    #print ("number of Nans in distPos is " + str(numNans) ) 
 
-    
     # Construct two masks: which correspond to the k-nearest neightbors: mask_anchor/positive
     # The total mask is then mask_total = mask_anchor v mask_positive
   
     #mask_anchor = torch.randint(0,2,[Nbatch,Nbatch])
     #mask_positive = torch.randint(0,2,[Nbatch,Nbatch])
     
-    mask_anchor = partition_assign (dist_matrix_anchors, k)
-    mask_positive = partition_assign (dist_matrix_positives, k)
+    mask_anchor = partition_assign (dist_matrix_anchors.detach().cpu().numpy(), k)
+    mask_positive = partition_assign (dist_matrix_positives.detach().cpu().numpy(), k)
 
     #logical_or function not in torch 1.4.0
     #mask_total = torch.logical_or(mask_anchor, mask_positive)
 
     #dummy or function
     mask_total = mask_anchor + mask_positive
-    mask_total = mask_total >= 1
+    mask_total = (mask_total >= 1).astype(int) 
     mask_total = torch.from_numpy(mask_total)
-    mask_total.cuda()
+
+    mask_total = mask_total.cuda()
+    #print (mask_total)
+    #print (dist_matrix_anchors)
+    #print (dist_matrix_positives)
 
     helper = dist_matrix_anchors * mask_total - dist_matrix_positives * mask_total
+    #numNans = torch.sum(helper!=helper)
+    #print ("number of Nans in helper is " + str(numNans) ) 
 
     # take norm of each row, take average
-    loss = torch.mean(torch.norm(helper,  dim = 1))
-
+    loss = torch.norm(helper,  dim = 1)
+    #numNans = torch.sum(loss!=loss)
+    #print ("number of Nans in vector is " + str(numNans) ) 
+    loss = torch.mean(loss)
+    #print (loss)
     return loss
 
 def global_orthogonal_regularization(anchor, negative):
