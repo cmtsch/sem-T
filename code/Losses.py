@@ -180,7 +180,7 @@ def loss_SOS (anchor, positive, use_KnearestNeighbors = True, k = 2):
     # Calculate the L2 norm
     dist_matrix_anchors = distance_matrix_vector(anchor, anchor)
     dist_matrix_positives = distance_matrix_vector(positive, positive)
-    print (dist_matrix_positives)
+    #print (dist_matrix_positives)
 
     
     # Construct two masks: which correspond to the k-nearest neightbors: mask_anchor/positive
@@ -188,14 +188,18 @@ def loss_SOS (anchor, positive, use_KnearestNeighbors = True, k = 2):
   
     mask_anchor = torch.randint(0,2,[Nbatch,Nbatch])
     mask_positive = torch.randint(0,2,[Nbatch,Nbatch])
+    
     #mask_anchor = partition_assign (dist_matrix_anchors, k)
     #mask_positive = partition_assign (dist_matrix_positives, k)
-    mask_total = torch.Tensor.logical_or(mask_anchor, mask_positive)
 
+    #logical_or function not in torch 1.4.0
+    #mask_total = torch.logical_or(mask_anchor, mask_positive)
+
+    #dummy or function
+    mask_total = mask_anchor + mask_positive
+    mask_total = mask_total >= 1
 
     helper = dist_matrix_anchors * mask_total - dist_matrix_positives * mask_total
-    #print (mask_total)
-    #print (helper)
 
     # take norm of each row, take average
     loss = torch.mean(torch.norm(helper,  dim = 1))
