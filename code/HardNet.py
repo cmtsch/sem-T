@@ -329,7 +329,7 @@ class HardNet(nn.Module):
 
 def weights_init(m):
     if isinstance(m, nn.Conv2d):
-        nn.init.orthogonal(m.weight.data, gain=0.6)
+        nn.init.orthogonal_(m.weight.data, gain=0.6)
         try:
             nn.init.constant(m.bias.data, 0.01)
         except:
@@ -337,6 +337,7 @@ def weights_init(m):
     return
 
 def create_loaders(load_random_triplets = False):
+    print ("Creation of data sets starts")
 
     test_dataset_names = copy.copy(dataset_names)
     test_dataset_names.remove(args.training_set)
@@ -387,6 +388,7 @@ def create_loaders(load_random_triplets = False):
                         shuffle=False, **kwargs)}
                     for name in test_dataset_names]
 
+    print ("Creation of data sets has ended")
     return train_loader, test_loaders
 
 def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False):
@@ -468,8 +470,11 @@ def test(test_loader, model, epoch, logger, logger_test_name):
         if args.cuda:
             data_a, data_p = data_a.cuda(), data_p.cuda()
 
-        data_a, data_p, label = Variable(data_a, volatile=True), \
-                                Variable(data_p, volatile=True), Variable(label)
+        #data_a, data_p, label = Variable(data_a, volatile=True), \
+        #                        Variable(data_p, volatile=True), Variable(label)
+        data_a.requires_grad_(False)
+        data_p.requires_grad_(False)
+
         out_a = model(data_a)
         out_p = model(data_p)
         dists = torch.sqrt(torch.sum((out_a - out_p) ** 2, 1))  # euclidean distance
