@@ -3,6 +3,7 @@ import torch.nn as nn
 import sys
 import numpy as np
 
+
 def distance_matrix_vector(anchor, positive):
     """Given batch of anchor descriptors and positive descriptors calculate distance matrix"""
 
@@ -202,6 +203,19 @@ def loss_SOS (anchor, positive, use_KnearestNeighbors = True, k = 2):
     loss = torch.norm(helper,  dim = 1)
     loss = torch.mean(loss)
     return loss
+    
+def loss_MI (anchor, positive, MI_type):
+    
+    Nbatch, dimensions = anchor.size()
+    
+    x=torch.cat([anchor, postive], dim=0)
+    
+    labels = torch.arange(Nbatch)
+    labels = torch.cat([labels, labels], dim=0)
+
+    return MI_losses.fenchel_dual_loss (x, labels, MI_type)
+
+
 
 def global_orthogonal_regularization(anchor, negative):
 

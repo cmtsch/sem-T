@@ -1,5 +1,6 @@
 # Data with which hardnet works
 data/
+reports/
 examples/
 lsf*
 .txt

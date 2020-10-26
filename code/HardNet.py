@@ -34,7 +34,7 @@ import cv2
 import copy
 import PIL
 from EvalMetrics import ErrorRateAt95Recall
-from Losses import loss_HardNet, loss_random_sampling, loss_L2Net, global_orthogonal_regularization, loss_SOS
+from Losses import loss_HardNet, loss_random_sampling, loss_L2Net, global_orthogonal_regularization, loss_SOS, loss_MI 
 from W1BS import w1bs_extract_descs_and_save
 from Utils import L2Norm, cv2_scale, np_reshape
 from Utils import str2bool
@@ -137,6 +137,8 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='LI',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--lossSOS', type=bool, default=True, metavar='SOS',
                     help='use the Second Order Similarity loss')
+parser.add_argument('--MiLoss', default= 'JSD',
+                    help='Other options: JSD, VD, infoNCE')
 
 args = parser.parse_args()
 
@@ -435,6 +437,9 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
             
         if args.gor:
             loss += args.alpha*global_orthogonal_regularization(out_a, out_n)
+
+        if args.MiLoss != 'none':
+            loss += loss_MI (out_a, out_n, args.MiLoss)
             
         optimizer.zero_grad()
         loss.backward()
