@@ -143,6 +143,9 @@ def loss_HardNet(anchor, positive, anchor_swap = False, anchor_ave = False,\
         sys.exit(1)
     if loss_type == "triplet_margin":
         loss = torch.clamp(margin + pos - min_neg, min=0.0)
+    if loss_type == "triplet_quadratic":
+        lin_loss = torch.clamp(margin + pos - min_neg, min=0.0)
+        loss = torch.square(lin_loss)
     elif loss_type == 'softmax':
         exp_pos = torch.exp(2.0 - pos);
         exp_den = exp_pos + torch.exp(2.0 - min_neg) + eps;
@@ -150,7 +153,7 @@ def loss_HardNet(anchor, positive, anchor_swap = False, anchor_ave = False,\
     elif loss_type == 'contrastive':
         loss = torch.clamp(margin - min_neg, min=0.0) + pos;
     else: 
-        print ('Unknown loss type. Try triplet_margin, softmax or contrastive')
+        print ('Unknown loss type. Try triplet_margin, triplet_quadratic, softmax or contrastive')
         sys.exit(1)
     loss = torch.mean(loss)
     return loss
@@ -206,6 +209,8 @@ def loss_SOS (anchor, positive, use_KnearestNeighbors = True, k = 2):
     
 def loss_MI (anchor, positive, MI_type):
     
+    print ("Called loss_MI with type " + MI_type)
+
     Nbatch, dimensions = anchor.size()
     
     x=torch.cat([anchor, postive], dim=0)
@@ -213,9 +218,11 @@ def loss_MI (anchor, positive, MI_type):
     labels = torch.arange(Nbatch)
     labels = torch.cat([labels, labels], dim=0)
 
-    return MI_losses.fenchel_dual_loss (x, labels, MI_type)
 
-
+    if (MI_type != 'infoNCE'):
+        return MI_losses.fenchel_dual_loss (x, labels, MI_type)
+    else: # infoNCE
+        return MI_losses.infonce_loss(x,labels)
 
 def global_orthogonal_regularization(anchor, negative):
 

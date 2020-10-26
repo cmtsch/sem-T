@@ -44,6 +44,8 @@ def fenchel_dual_loss(x, classes, measure=None):
     '''
     supported_measures = ['DV', 'JSD']
 
+    print ("Fenchel dual loss called")
+
     def get_positive_expectation(p_samples, measure):
         log_2 = math.log(2.)
         if measure == 'JSD':
@@ -96,6 +98,8 @@ def infonce_loss(x, classes):
         torch.Tensor: Loss.
     '''
     n_samples, dim = x.size()
+    
+    print ("InfoNCE loss called")
 
     # Compute similarities and mask them for positive and negative ones
     sim = x @ x.t()

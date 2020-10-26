@@ -75,7 +75,7 @@ parser.add_argument('--experiment-name', default= 'liberty_train/',
 parser.add_argument('--training-set', default= 'liberty',
                     help='Other options: notredame, yosemite')
 parser.add_argument('--loss', default= 'triplet_margin',
-                    help='Other options: softmax, contrastive')
+                    help='Other options: softmax, contrastive, triplet_quadratic')
 parser.add_argument('--batch-reduce', default= 'min',
                     help='Other options: average, random, random_global, L2Net')
 parser.add_argument('--num-workers', default= 0, type=int,
@@ -135,10 +135,16 @@ parser.add_argument('--seed', type=int, default=0, metavar='S',
                     help='random seed (default: 0)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='LI',
                     help='how many batches to wait before logging training status')
-parser.add_argument('--lossSOS', type=bool, default=True, metavar='SOS',
+                    
+#parser.add_argument('--tripletLoss', default= 'linear',
+#                    help='Other options: quadratic (SOSNet)')
+parser.add_argument('--lossSOS', type=bool, default=False, metavar='SOS',
                     help='use the Second Order Similarity loss')
 parser.add_argument('--MiLoss', default= 'JSD',
                     help='Other options: JSD, VD, infoNCE')
+parser.add_argument('--uniquePairs', type=bool, default=True, metavar='UQT',
+                    help='in one training batch there is at most one pair corresponding to the same real world oject')
+
 
 args = parser.parse_args()
 
@@ -192,7 +198,7 @@ class TripletPhotoTour(dset.PhotoTour):
     note: a triplet is composed by a pair of matching images and one of
     different class.
     """
-    def __init__(self, train=True, transform=None, batch_size = None,load_random_triplets = False,  *arg, **kw):
+    def __init__(self, train=True, transform=None, batch_size = None,load_random_triplets = False, uniquePairs=True,  *arg, **kw):
         super(TripletPhotoTour, self).__init__(*arg, **kw)
         self.transform = transform
         self.out_triplets = load_random_triplets
@@ -225,8 +231,9 @@ class TripletPhotoTour(dset.PhotoTour):
             if len(already_idxs) >= args.batch_size:
                 already_idxs = set()
             c1 = np.random.randint(0, n_classes)
-            while c1 in already_idxs:
-                c1 = np.random.randint(0, n_classes)
+            if (uniquePairs):
+                while c1 in already_idxs:
+                    c1 = np.random.randint(0, n_classes)
             already_idxs.add(c1)
             c2 = np.random.randint(0, n_classes)
             while c1 == c2:
@@ -374,7 +381,8 @@ def create_loaders(load_random_triplets = False):
                              root=args.dataroot,
                              name=args.training_set,
                              download=True,
-                             transform=transform_train),
+                             transform=transform_train,
+                             uniquePairs= args.uniquePairs),
                              batch_size=args.batch_size,
                              shuffle=False, **kwargs)
 
@@ -385,7 +393,8 @@ def create_loaders(load_random_triplets = False):
                      root=args.dataroot,
                      name=name,
                      download=True,
-                     transform=transform_test),
+                     transform=transform_test,
+                     uniquePairs = args.uniquePairs),
                         batch_size=args.test_batch_size,
                         shuffle=False, **kwargs)}
                     for name in test_dataset_names]
@@ -559,7 +568,7 @@ def main(train_loader, test_loaders, model, logger, file_logger):
     for epoch in range(start, end):
 
         # iterate over test loaders and test results
-        #train(train_loader, model, optimizer1, epoch, logger, triplet_flag)
+        train(train_loader, model, optimizer1, epoch, logger, triplet_flag)
         for test_loader in test_loaders:
             test(test_loader['dataloader'], model, epoch, logger, test_loader['name'])
         
@@ -597,6 +606,7 @@ def main(train_loader, test_loaders, model, logger, file_logger):
 
 
 if __name__ == '__main__':
+    print ("Start of main")
     LOG_DIR = args.log_dir
     if not os.path.isdir(LOG_DIR):
         os.makedirs(LOG_DIR)
