@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import sys
 import numpy as np
+import MI_losses
 
 
 def distance_matrix_vector(anchor, positive):
@@ -143,7 +144,7 @@ def loss_HardNet(anchor, positive, anchor_swap = False, anchor_ave = False,\
         sys.exit(1)
     if loss_type == "triplet_margin":
         loss = torch.clamp(margin + pos - min_neg, min=0.0)
-    if loss_type == "triplet_quadratic":
+    elif loss_type == "triplet_quadratic":
         lin_loss = torch.clamp(margin + pos - min_neg, min=0.0)
         loss = torch.square(lin_loss)
     elif loss_type == 'softmax':
@@ -213,7 +214,7 @@ def loss_MI (anchor, positive, MI_type):
 
     Nbatch, dimensions = anchor.size()
     
-    x=torch.cat([anchor, postive], dim=0)
+    x=torch.cat([anchor, positive], dim=0)
     
     labels = torch.arange(Nbatch)
     labels = torch.cat([labels, labels], dim=0)

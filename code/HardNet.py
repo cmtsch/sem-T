@@ -207,6 +207,7 @@ class TripletPhotoTour(dset.PhotoTour):
         self.train = train
         self.n_triplets = args.n_triplets
         self.batch_size = batch_size
+        self.unique_pairs = uniquePairs
 
         if self.train:
             print('Generating {} triplets'.format(self.n_triplets))
@@ -233,7 +234,7 @@ class TripletPhotoTour(dset.PhotoTour):
             if len(already_idxs) >= args.batch_size:
                 already_idxs = set()
             c1 = np.random.randint(0, n_classes)
-            if (uniquePairs):
+            if (args.uniquePairs):
                 while c1 in already_idxs:
                     c1 = np.random.randint(0, n_classes)
             already_idxs.add(c1)
@@ -454,7 +455,7 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
             loss += args.alpha*global_orthogonal_regularization(out_a, out_n)
 
         if args.MiLoss != 'none':
-            loss += loss_MI (out_a, out_n, args.MiLoss)
+            loss += loss_MI (out_a, out_p, args.MiLoss)
             
         optimizer.zero_grad()
         loss.backward()
