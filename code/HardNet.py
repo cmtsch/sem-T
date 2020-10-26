@@ -144,6 +144,8 @@ parser.add_argument('--MiLoss', default= 'JSD',
                     help='Other options: JSD, VD, infoNCE')
 parser.add_argument('--uniquePairs', type=bool, default=True, metavar='UQT',
                     help='in one training batch there is at most one pair corresponding to the same real world oject')
+parser.add_argument('--skipInit', type=bool, default=False, metavar='SQT',
+                    help='Skip Initialization of weights, for quick debug runs')
 
 
 args = parser.parse_args()
@@ -322,7 +324,11 @@ class HardNet(nn.Module):
             nn.Conv2d(128, 128, kernel_size=8, bias = False),
             nn.BatchNorm2d(128, affine=False),
         )
-        self.features.apply(weights_init)
+        if (args.skipInit):
+            print ("Skipping weight initialization!!")
+        else:
+            print ("Initializing weights")
+            self.features.apply(weights_init)
         return
     
     def input_norm(self,x):
