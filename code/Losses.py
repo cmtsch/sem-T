@@ -218,6 +218,7 @@ def loss_MI (anchor, positive, MI_type):
     
     labels = torch.arange(Nbatch)
     labels = torch.cat([labels, labels], dim=0)
+    labels.cuda()
 
 
     if (MI_type != 'infoNCE'):
