@@ -44,7 +44,7 @@ def fenchel_dual_loss(x, classes, measure=None):
     '''
     supported_measures = ['DV', 'JSD']
 
-    print ("Fenchel dual loss called")
+    #print ("Fenchel dual loss called")
 
     def get_positive_expectation(p_samples, measure):
         log_2 = math.log(2.)
@@ -99,7 +99,7 @@ def infonce_loss(x, classes):
     '''
     n_samples, dim = x.size()
     
-    print ("InfoNCE loss called")
+    #print ("InfoNCE loss called")
 
     # Compute similarities and mask them for positive and negative ones
     sim = x @ x.t()

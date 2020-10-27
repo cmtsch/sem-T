@@ -289,7 +289,7 @@ class TripletPhotoTour(dset.PhotoTour):
         if self.out_triplets:
             return (img_a, img_p, img_n)
         else:
-            return (img_a, img_p)
+            return (img_a, img_p, self.labels[index])
 
     def __len__(self):
         if self.train:
@@ -414,31 +414,34 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
     model.train()
     pbar = tqdm(enumerate(train_loader))
     for batch_idx, data in pbar:
-        if load_triplets:
-            data_a, data_p, data_n = data
+        #false
+        #if load_triplets:
+        #    data_a, data_p, data_n = data
         else:
-            data_a, data_p = data
+            data_a, data_p, classes = data
 
         if args.cuda:
             data_a, data_p  = data_a.cuda(), data_p.cuda()
             data_a, data_p = Variable(data_a), Variable(data_p)
             out_a = model(data_a)
             out_p = model(data_p)
-        if load_triplets:
-            data_n  = data_n.cuda()
-            data_n = Variable(data_n)
-            out_n = model(data_n)
+        #false
+        #if load_triplets:
+        #    data_n  = data_n.cuda()
+        #    data_n = Variable(data_n)
+        #    out_n = model(data_n)
 
-        if args.batch_reduce == 'L2Net':
-            loss = loss_L2Net(out_a, out_p, anchor_swap = args.anchorswap,
-                    margin = args.margin, loss_type = args.loss)
-        elif args.batch_reduce == 'random_global':
-            loss = loss_random_sampling(out_a, out_p, out_n,
-                margin=args.margin,
-                anchor_swap=args.anchorswap,
-                loss_type = args.loss)
+        #if args.batch_reduce == 'L2Net':
+        #    loss = loss_L2Net(out_a, out_p, anchor_swap = args.anchorswap,
+        #            margin = args.margin, loss_type = args.loss)
+        #elif args.batch_reduce == 'random_global':
+        #    loss = loss_random_sampling(out_a, out_p, out_n,
+        #        margin=args.margin,
+        #        anchor_swap=args.anchorswap,
+        #        loss_type = args.loss)
+        # Here hardest-in-batch
         else:
-            loss = loss_HardNet(out_a, out_p,
+            loss = loss_HardNet(out_a, out_p, classes,
                             margin=args.margin,
                             anchor_swap=args.anchorswap,
                             anchor_ave=args.anchorave,

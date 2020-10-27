@@ -87,7 +87,7 @@ def loss_L2Net(anchor, positive, anchor_swap = False,  margin = 1.0, loss_type =
     loss = torch.mean(loss)
     return loss
 
-def loss_HardNet(anchor, positive, anchor_swap = False, anchor_ave = False,\
+def loss_HardNet(anchor, positive, classes, anchor_swap = False, anchor_ave = False,\
         margin = 1.0, batch_reduce = 'min', loss_type = "triplet_margin"):
     """HardNet margin loss - calculates loss based on distance matrix based on positive distance and closest negative distance.
     """
@@ -98,12 +98,23 @@ def loss_HardNet(anchor, positive, anchor_swap = False, anchor_ave = False,\
     dist_matrix = distance_matrix_vector(anchor, positive) +eps
     eye = torch.autograd.Variable(torch.eye(dist_matrix.size(1))).cuda()
 
+
     # steps to filter out same patches that occur in distance matrix as negatives
     pos1 = torch.diag(dist_matrix)
-    dist_without_min_on_diag = dist_matrix+eye*10
-    mask = (dist_without_min_on_diag.ge(0.008).float()-1.0)*(-1)
-    mask = mask.type_as(dist_without_min_on_diag)*10
-    dist_without_min_on_diag = dist_without_min_on_diag+mask
+
+    ## New: we need to filter out the ones that belong to the same class
+    p_mask = (classes[:, None] == classes[None, :]).float()
+    p_mask = p_mask.type_as(dist_without_min_on_diag) * 42
+    dist_without_min_on_diag = dist_without_min_on_diag+p_mask
+
+
+    ##dist_without_min_on_diag = dist_matrix+eye*10
+    ##mask = (dist_without_min_on_diag.ge(0.008).float()-1.0)*(-1)
+    ## mask marks elements which are smaller than 0.008
+    ## we assume those are the exact same patch and should not be considered
+    ##mask = mask.type_as(dist_without_min_on_diag)*10
+    ## now we use the mask to artificially increase the distance of those
+    ##dist_without_min_on_diag = dist_without_min_on_diag+mask
     if batch_reduce == 'min':
         min_neg = torch.min(dist_without_min_on_diag,1)[0]
         if anchor_swap:
@@ -210,7 +221,7 @@ def loss_SOS (anchor, positive, use_KnearestNeighbors = True, k = 2):
     
 def loss_MI (anchor, positive, MI_type):
     
-    print ("Called loss_MI with type " + MI_type)
+    #print ("Called loss_MI with type " + MI_type)
 
     Nbatch, dimensions = anchor.size()
     
@@ -218,7 +229,7 @@ def loss_MI (anchor, positive, MI_type):
     
     labels = torch.arange(Nbatch)
     labels = torch.cat([labels, labels], dim=0)
-    labels.cuda()
+    labels = labels.cuda()
 
 
     if (MI_type != 'infoNCE'):
