@@ -417,8 +417,8 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
         #false
         #if load_triplets:
         #    data_a, data_p, data_n = data
-        else:
-            data_a, data_p, classes = data
+        #else:
+        data_a, data_p, classes = data
 
         if args.cuda:
             data_a, data_p  = data_a.cuda(), data_p.cuda()
@@ -440,13 +440,14 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
         #        anchor_swap=args.anchorswap,
         #        loss_type = args.loss)
         # Here hardest-in-batch
-        else:
-            loss = loss_HardNet(out_a, out_p, classes,
-                            margin=args.margin,
-                            anchor_swap=args.anchorswap,
-                            anchor_ave=args.anchorave,
-                            batch_reduce = args.batch_reduce,
-                            loss_type = args.loss)
+        #else:
+
+        loss = loss_HardNet(out_a, out_p, classes,
+                        margin=args.margin,
+                        anchor_swap=args.anchorswap,
+                        anchor_ave=args.anchorave,
+                        batch_reduce = args.batch_reduce,
+                        loss_type = args.loss)
         
         if args.lossSOS:
             loss += loss_SOS(out_a, out_p)

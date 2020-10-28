@@ -104,8 +104,8 @@ def loss_HardNet(anchor, positive, classes, anchor_swap = False, anchor_ave = Fa
 
     ## New: we need to filter out the ones that belong to the same class
     p_mask = (classes[:, None] == classes[None, :]).float()
-    p_mask = p_mask.type_as(dist_without_min_on_diag) * 42
-    dist_without_min_on_diag = dist_without_min_on_diag+p_mask
+    p_mask = p_mask.type_as(dist_matrix) * 42
+    dist_without_min_on_diag = dist_matrix+p_mask
 
 
     ##dist_without_min_on_diag = dist_matrix+eye*10
