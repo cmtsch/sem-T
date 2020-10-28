@@ -228,6 +228,18 @@ class TripletPhotoTour(dset.PhotoTour):
         indices = create_indices(labels.numpy())
         unique_labels = np.unique(labels.numpy())
         n_classes = unique_labels.shape[0]
+
+        ## Alternative way fo generating pairs
+        ## Iterate over all classes
+        ## Consider all pair-wise possibilities
+
+        maxSamples = len (indices, dim = 2)
+        lengths = {k: len(v) for k, v in indices.items()}
+        maxSamples = max(lengths, key=lengths.get)
+        print ( "Most patches for a given class: " + str(maxSamples))
+
+
+
         # add only unique indices in batch
         already_idxs = set()
         duplicateCounter = 0
@@ -237,7 +249,7 @@ class TripletPhotoTour(dset.PhotoTour):
             ##if len(already_idxs) >= args.batch_size:
             if tripletCtr >= args.batch_size:
                 already_idxs = set()
-                print ("There are " + str(duplicateCounter) + "duplicates in that batch of size " + str(tripletCtr))
+                print ("There are " + str(duplicateCounter) + " duplicates in that batch of size " + str(tripletCtr))
                 duplicateCounter = 0
                 tripletCtr = 0
             c1 = np.random.randint(0, n_classes)
