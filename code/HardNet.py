@@ -136,6 +136,7 @@ parser.add_argument('--seed', type=int, default=0, metavar='S',
 parser.add_argument('--log-interval', type=int, default=10, metavar='LI',
                     help='how many batches to wait before logging training status')
                     
+## I moved this distinction to the --LossType parameter
 #parser.add_argument('--tripletLoss', default= 'linear',
 #                    help='Other options: quadratic (SOSNet)')
 parser.add_argument('--lossSOS', type=bool, default=False, metavar='SOS',
@@ -229,14 +230,23 @@ class TripletPhotoTour(dset.PhotoTour):
         n_classes = unique_labels.shape[0]
         # add only unique indices in batch
         already_idxs = set()
+        duplicateCounter = 0
+        tripletCtr = 0
 
         for x in tqdm(range(num_triplets)):
-            if len(already_idxs) >= args.batch_size:
+            ##if len(already_idxs) >= args.batch_size:
+            if tripletCtr >= args.batch_size:
                 already_idxs = set()
+                print ("There are " + str(duplicateCounter) + "duplicates in that batch of size " + str(tripletCtr))
+                duplicateCounter = 0
+                tripletCtr = 0
             c1 = np.random.randint(0, n_classes)
-            if (args.uniquePairs):
-                while c1 in already_idxs:
-                    c1 = np.random.randint(0, n_classes)
+            if c1 in already_idxs:
+                if (args.uniquePairs):
+                    duplicateCounter += 1
+                else:
+                    while c1 in already_idxs:
+                        c1 = np.random.randint(0, n_classes)
             already_idxs.add(c1)
             c2 = np.random.randint(0, n_classes)
             while c1 == c2:
@@ -250,6 +260,7 @@ class TripletPhotoTour(dset.PhotoTour):
                     n2 = np.random.randint(0, len(indices[c1]))
             n3 = np.random.randint(0, len(indices[c2]))
             triplets.append([indices[c1][n1], indices[c1][n2], indices[c2][n3]])
+            tripletCtr +=1
         return torch.LongTensor(np.array(triplets))
 
     def __getitem__(self, index):
