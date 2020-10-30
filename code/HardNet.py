@@ -34,7 +34,7 @@ import cv2
 import copy
 import PIL
 from EvalMetrics import ErrorRateAt95Recall
-from Losses import loss_HardNet, loss_random_sampling, loss_L2Net, global_orthogonal_regularization, loss_SOS, loss_MI 
+from Losses import loss_HardNet, global_orthogonal_regularization, loss_SOS, loss_MI 
 from W1BS import w1bs_extract_descs_and_save
 from Utils import L2Norm, cv2_scale, np_reshape
 from Utils import str2bool
@@ -201,10 +201,9 @@ class TripletPhotoTour(dset.PhotoTour):
     note: a triplet is composed by a pair of matching images and one of
     different class.
     """
-    def __init__(self, train=True, transform=None, batch_size = None,load_random_triplets = False, uniquePairs=True,  *arg, **kw):
+    def __init__(self, train=True, transform=None, batch_size = None, uniquePairs=True,  *arg, **kw):
         super(TripletPhotoTour, self).__init__(*arg, **kw)
         self.transform = transform
-        self.out_triplets = load_random_triplets
         self.train = train
         self.n_triplets = args.n_triplets
         self.batch_size = batch_size
@@ -229,9 +228,6 @@ class TripletPhotoTour(dset.PhotoTour):
         unique_labels = np.unique(labels.numpy())
         n_classes = unique_labels.shape[0]
 
-        ## Alternative way fo generating pairs
-        ## Iterate over all classes
-        ## Consider all pair-wise possibilities
 
         #maxSamples = len (indices, dim = 2)
         lengths = {k: len(v) for k, v in indices.items()}
@@ -240,24 +236,31 @@ class TripletPhotoTour(dset.PhotoTour):
         print ( "Total number of patches: " + str(sum(lenghts.values())))
         
 
-        ## Completely different concept for generating triplets:
-        ## Literally just iterate over the different labels
+        ##### SAMPLING B ######
+        ## Alternative way fo generating pairs
+        ## Iterate over all classes
+        ## Consider all pair-wise possibilities
+        already_idxs1 = set()
         tripletCounter = 0
+
         while (tripletCounter < num_triplets):
             # randomly select a class label
             c = np.random.randint(0, n_classes)
+            while c in already_idxs1:
+                c = np.random.randint(0, n_classes)
+            already_idxs1.add(c)
+
+            if (len (already_idxs1) == n_classes):
+                already_idxs1 = set()
+
             # take all combinations
             for n1 in range(len(indices[c])):
                 for n2 in range (n1+1, len(indices[c])):
-                    triplets.append([indices[c][n1], indices[c][n2], indices[0][0]])
+                    triplets.append([indices[c][n1], indices[c][n2], c])
                     tripletCounter += 1
 
 
-
-
-
-
-
+        ##### SAMPLING A ######
         # add only unique indices in batch
         already_idxs = set()
         duplicateCounter = 0
@@ -265,32 +268,31 @@ class TripletPhotoTour(dset.PhotoTour):
 
         #for x in tqdm(range(num_triplets)):
         for x in tqdm(range(0)):
+            print ("This should NOT be printed")
             ##if len(already_idxs) >= args.batch_size:
             if tripletCtr >= args.batch_size:
                 already_idxs = set()
                 print ("There are " + str(duplicateCounter) + " duplicates in that batch of size " + str(tripletCtr))
                 duplicateCounter = 0
                 tripletCtr = 0
-            c1 = np.random.randint(0, n_classes)
-            if c1 in already_idxs:
+            c = np.random.randint(0, n_classes)
+            if c in already_idxs:
                 if (args.uniquePairs):
                     duplicateCounter += 1
                 else:
-                    while c1 in already_idxs:
-                        c1 = np.random.randint(0, n_classes)
-            already_idxs.add(c1)
-            c2 = np.random.randint(0, n_classes)
-            while c1 == c2:
-                c2 = np.random.randint(0, n_classes)
-            if len(indices[c1]) == 2:  # hack to speed up process
+                    while c in already_idxs:
+                        c = np.random.randint(0, n_classes)
+            already_idxs.add(c)
+
+            # find subIDs of patche in class c
+            if len(indices[c]) == 2:  # hack to speed up process
                 n1, n2 = 0, 1
             else:
-                n1 = np.random.randint(0, len(indices[c1]))
-                n2 = np.random.randint(0, len(indices[c1]))
+                n1 = np.random.randint(0, len(indices[c]))
+                n2 = np.random.randint(0, len(indices[c]))
                 while n1 == n2:
-                    n2 = np.random.randint(0, len(indices[c1]))
-            n3 = np.random.randint(0, len(indices[c2]))
-            triplets.append([indices[c1][n1], indices[c1][n2], indices[c2][n3]])
+                    n2 = np.random.randint(0, len(indices[c]))
+            triplets.append([indices[c][n1], indices[c][n2], c])
             tripletCtr +=1
         return torch.LongTensor(np.array(triplets))
 
@@ -307,13 +309,11 @@ class TripletPhotoTour(dset.PhotoTour):
             return img1, img2, m[2]
 
         t = self.triplets[index]
-        a, p, n = self.data[t[0]], self.data[t[1]], self.data[t[2]]
+        a, p, label = self.data[t[0]], self.data[t[1]], t[2]
 
         img_a = transform_img(a)
         img_p = transform_img(p)
-        img_n = None
-        if self.out_triplets:
-            img_n = transform_img(n)
+
         # transform images if required
         if args.fliprot:
             do_flip = random.random() > 0.5
@@ -321,17 +321,11 @@ class TripletPhotoTour(dset.PhotoTour):
             if do_rot:
                 img_a = img_a.permute(0,2,1)
                 img_p = img_p.permute(0,2,1)
-                if self.out_triplets:
-                    img_n = img_n.permute(0,2,1)
             if do_flip:
                 img_a = torch.from_numpy(deepcopy(img_a.numpy()[:,:,::-1]))
                 img_p = torch.from_numpy(deepcopy(img_p.numpy()[:,:,::-1]))
-                if self.out_triplets:
-                    img_n = torch.from_numpy(deepcopy(img_n.numpy()[:,:,::-1]))
-        if self.out_triplets:
-            return (img_a, img_p, img_n)
-        else:
-            return (img_a, img_p, self.labels[index])
+        #return image patches and class label
+        return (img_a, img_p, label)
 
     def __len__(self):
         if self.train:
@@ -425,7 +419,6 @@ def create_loaders(load_random_triplets = False):
         transform_test = transform
     train_loader = torch.utils.data.DataLoader(
             TripletPhotoTour(train=True,
-                             load_random_triplets = load_random_triplets,
                              batch_size=args.batch_size,
                              root=args.dataroot,
                              name=args.training_set,
@@ -456,34 +449,15 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
     model.train()
     pbar = tqdm(enumerate(train_loader))
     for batch_idx, data in pbar:
-        #false
-        #if load_triplets:
-        #    data_a, data_p, data_n = data
-        #else:
-        data_a, data_p, classes = data
 
+        data_a, data_p, classes = data
         if args.cuda:
             data_a, data_p  = data_a.cuda(), data_p.cuda()
             data_a, data_p = Variable(data_a), Variable(data_p)
             out_a = model(data_a)
             out_p = model(data_p)
-        #false
-        #if load_triplets:
-        #    data_n  = data_n.cuda()
-        #    data_n = Variable(data_n)
-        #    out_n = model(data_n)
 
-        #if args.batch_reduce == 'L2Net':
-        #    loss = loss_L2Net(out_a, out_p, anchor_swap = args.anchorswap,
-        #            margin = args.margin, loss_type = args.loss)
-        #elif args.batch_reduce == 'random_global':
-        #    loss = loss_random_sampling(out_a, out_p, out_n,
-        #        margin=args.margin,
-        #        anchor_swap=args.anchorswap,
-        #        loss_type = args.loss)
-        # Here hardest-in-batch
-        #else:
-
+        # Here hardest-in-batch aka HardNet
         loss = loss_HardNet(out_a, out_p, classes,
                         margin=args.margin,
                         anchor_swap=args.anchorswap,
@@ -537,8 +511,6 @@ def test(test_loader, model, epoch, logger, logger_test_name):
         if args.cuda:
             data_a, data_p = data_a.cuda(), data_p.cuda()
 
-        #data_a, data_p, label = Variable(data_a, volatile=True), \
-        #                        Variable(data_p, volatile=True), Variable(label)
         data_a.requires_grad_(False)
         data_p.requires_grad_(False)
 
