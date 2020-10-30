@@ -370,7 +370,7 @@ def main(train_loader, test_loaders, model, logger, file_logger):
                                          methods=["SNN_ratio"],
                                          descs_to_draw=[desc_name])
         #randomize train loader batches
-        train_loader, test_loaders2 = create_loaders(args)
+        train_loader, test_loaders2 = create_loaders(args, dataset_names)
 
 
 if __name__ == '__main__':
@@ -389,5 +389,5 @@ if __name__ == '__main__':
         from Loggers import Logger, FileLogger
         logger = Logger(LOG_DIR)
         #file_logger = FileLogger(./log/+suffix)
-    train_loader, test_loaders = create_loaders(args)
+    train_loader, test_loaders = create_loaders(args, dataset_names)
     main(train_loader, test_loaders, model, logger, file_logger)

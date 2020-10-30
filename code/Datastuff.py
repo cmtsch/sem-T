@@ -168,7 +168,7 @@ class TripletPhotoTour(dset.PhotoTour):
             return self.matches.size(0)
 
 
-def create_loaders(args ):
+def create_loaders(args , dataset_names):
     print ("Creation of data sets starts")
 
     test_dataset_names = copy.copy(dataset_names)
@@ -202,9 +202,8 @@ def create_loaders(args ):
                              batch_size=args.batch_size,
                              root=args.dataroot,
                              name=args.training_set,
-                             batch_size= args.batch_size
-                             fliprot = args.fliprot
-                             n_triplets = args.n_triplets
+                             fliprot = args.fliprot,
+                             n_triplets = args.n_triplets,
                              download=True,
                              transform=transform_train,
                              uniquePairs= args.uniquePairs),
@@ -217,9 +216,8 @@ def create_loaders(args ):
                      batch_size=args.test_batch_size,
                      root=args.dataroot,
                      name=name,
-                     batch_size= args.batch_size
-                     fliprot = args.fliprot
-                     n_triplets = args.n_triplets
+                     fliprot = args.fliprot,
+                     n_triplets = args.n_triplets,
                      download=True,
                      transform=transform_test,
                      uniquePairs = args.uniquePairs),
