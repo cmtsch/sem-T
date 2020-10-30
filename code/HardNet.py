@@ -370,7 +370,7 @@ def main(train_loader, test_loaders, model, logger, file_logger):
                                          methods=["SNN_ratio"],
                                          descs_to_draw=[desc_name])
         #randomize train loader batches
-        train_loader, test_loaders2 = create_loaders(load_random_triplets=triplet_flag)
+        train_loader, test_loaders2 = create_loaders(args)
 
 
 if __name__ == '__main__':
@@ -384,10 +384,10 @@ if __name__ == '__main__':
         if not os.path.isdir(DESCS_DIR):
             os.makedirs(DESCS_DIR)
     logger, file_logger = None, None
-    model = HardNet()
+    model = HardNet(args.skipInit)
     if(args.enable_logging):
         from Loggers import Logger, FileLogger
         logger = Logger(LOG_DIR)
         #file_logger = FileLogger(./log/+suffix)
-    train_loader, test_loaders = create_loaders(load_random_triplets = triplet_flag)
+    train_loader, test_loaders = create_loaders(args)
     main(train_loader, test_loaders, model, logger, file_logger)

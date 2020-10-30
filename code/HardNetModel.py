@@ -29,7 +29,7 @@ import torch.nn.functional as F
 class HardNet(nn.Module):
     """HardNet model definition
     """
-    def __init__(self):
+    def __init__(self, skipInit=False):
         super(HardNet, self).__init__()
         self.features = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=3, padding=1, bias = False),
@@ -54,7 +54,7 @@ class HardNet(nn.Module):
             nn.Conv2d(128, 128, kernel_size=8, bias = False),
             nn.BatchNorm2d(128, affine=False),
         )
-        if (args.skipInit):
+        if (skipInit):
             print ("Skipping weight initialization!!")
         else:
             print ("Initializing weights")

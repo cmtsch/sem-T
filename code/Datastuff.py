@@ -34,20 +34,21 @@ class TripletPhotoTour(dset.PhotoTour):
     note: a triplet is composed by a pair of matching images and one of
     different class.
     """
-    def __init__(self, train=True, transform=None, batch_size = None, uniquePairs=True,  *arg, **kw):
+    def __init__(self, train=True, transform=None, n_triplets = 50000, fliprot = False, batch_size = None, uniquePairs=True,  *arg, **kw):
         super(TripletPhotoTour, self).__init__(*arg, **kw)
         self.transform = transform
         self.train = train
-        self.n_triplets = args.n_triplets
+        self.n_triplets = n_triplets
+        self.fliprot = fliprot
         self.batch_size = batch_size
         self.unique_pairs = uniquePairs
 
         if self.train:
             print('Generating {} triplets'.format(self.n_triplets))
-            self.triplets = self.generate_triplets(self.labels, self.n_triplets)
+            self.triplets = self.generate_triplets(self.labels, self.n_triplets, self.batch_size, self.unique_pairs)
 
     @staticmethod
-    def generate_triplets(labels, num_triplets):
+    def generate_triplets(labels, num_triplets, batch_size, unique_pairs):
         def create_indices(_labels):
             inds = dict()
             for idx, ind in enumerate(_labels):
@@ -102,15 +103,15 @@ class TripletPhotoTour(dset.PhotoTour):
         #for x in tqdm(range(num_triplets)):
         for x in tqdm(range(0)):
             print ("This should NOT be printed")
-            ##if len(already_idxs) >= args.batch_size:
-            if tripletCtr >= args.batch_size:
+            ##if len(already_idxs) >= batch_size:
+            if tripletCtr >= batch_size:
                 already_idxs = set()
                 print ("There are " + str(duplicateCounter) + " duplicates in that batch of size " + str(tripletCtr))
                 duplicateCounter = 0
                 tripletCtr = 0
             c = np.random.randint(0, n_classes)
             if c in already_idxs:
-                if (args.uniquePairs):
+                if (unique_pairs):
                     duplicateCounter += 1
                 else:
                     while c in already_idxs:
@@ -148,7 +149,7 @@ class TripletPhotoTour(dset.PhotoTour):
         img_p = transform_img(p)
 
         # transform images if required
-        if args.fliprot:
+        if self.fliprot:
             do_flip = random.random() > 0.5
             do_rot = random.random() > 0.5
             if do_rot:
@@ -167,7 +168,7 @@ class TripletPhotoTour(dset.PhotoTour):
             return self.matches.size(0)
 
 
-def create_loaders(load_random_triplets = False):
+def create_loaders(args ):
     print ("Creation of data sets starts")
 
     test_dataset_names = copy.copy(dataset_names)
@@ -201,6 +202,9 @@ def create_loaders(load_random_triplets = False):
                              batch_size=args.batch_size,
                              root=args.dataroot,
                              name=args.training_set,
+                             batch_size= args.batch_size
+                             fliprot = args.fliprot
+                             n_triplets = args.n_triplets
                              download=True,
                              transform=transform_train,
                              uniquePairs= args.uniquePairs),
@@ -213,6 +217,9 @@ def create_loaders(load_random_triplets = False):
                      batch_size=args.test_batch_size,
                      root=args.dataroot,
                      name=name,
+                     batch_size= args.batch_size
+                     fliprot = args.fliprot
+                     n_triplets = args.n_triplets
                      download=True,
                      transform=transform_test,
                      uniquePairs = args.uniquePairs),
