@@ -233,10 +233,28 @@ class TripletPhotoTour(dset.PhotoTour):
         ## Iterate over all classes
         ## Consider all pair-wise possibilities
 
-        maxSamples = len (indices, dim = 2)
+        #maxSamples = len (indices, dim = 2)
         lengths = {k: len(v) for k, v in indices.items()}
         maxSamples = max(lengths, key=lengths.get)
-        print ( "Most patches for a given class: " + str(maxSamples))
+        print ( "Most patches for a given class: " + str(len(indices[maxSamples])))
+        print ( "Total number of patches: " + str(sum(lenghts.values())))
+        
+
+        ## Completely different concept for generating triplets:
+        ## Literally just iterate over the different labels
+        tripletCounter = 0
+        while (tripletCounter < num_triplets):
+            # randomly select a class label
+            c = np.random.randint(0, n_classes)
+            # take all combinations
+            for n1 in range(len(indices[c])):
+                for n2 in range (n1+1, len(indices[c])):
+                    triplets.append([indices[c][n1], indices[c][n2], indices[0][0]])
+                    tripletCounter += 1
+
+
+
+
 
 
 
@@ -245,7 +263,8 @@ class TripletPhotoTour(dset.PhotoTour):
         duplicateCounter = 0
         tripletCtr = 0
 
-        for x in tqdm(range(num_triplets)):
+        #for x in tqdm(range(num_triplets)):
+        for x in tqdm(range(0)):
             ##if len(already_idxs) >= args.batch_size:
             if tripletCtr >= args.batch_size:
                 already_idxs = set()
