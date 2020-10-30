@@ -288,7 +288,7 @@ class TotalDatasetsLoader(data.Dataset):
             if self.train:
                 return self.triplets.size(0)
 
-class TripletPhotoTour(dset.PhotoTour):
+class TripletPhotoTourOLD(dset.PhotoTour):
     """From the PhotoTour Dataset it generates triplet samples
     note: a triplet is composed by a pair of matching images and one of
     different class.
@@ -329,6 +329,7 @@ class TripletPhotoTour(dset.PhotoTour):
     std = {'notredame': 0.1864, 'yosemite': 0.1818, 'liberty': 0.2019, 'notredame_harris': 0.1864, 'yosemite_harris': 0.1818, 'liberty_harris': 0.2019}
     lens = {'notredame': 468159, 'yosemite': 633587, 'liberty': 450092, 'liberty_harris': 379587, 'yosemite_harris': 450912 , 'notredame_harris': 325295}
     def __init__(self, train=True, transform=None, batch_size = None, n_triplets = 5000, load_random_triplets = False,  *arg, **kw):
+        print ("Trying to generate an object of outdated class TripletPhotoTourOLD")
         super(TripletPhotoTour, self).__init__(*arg, **kw)
         self.transform = transform
         self.out_triplets = load_random_triplets
