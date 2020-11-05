@@ -63,71 +63,68 @@ class TripletPhotoTour(dset.PhotoTour):
         n_classes = unique_labels.shape[0]
 
 
-        #maxSamples = len (indices, dim = 2)
-        lengths = {k: len(v) for k, v in indices.items()}
-        maxSamples = max(lengths, key=lengths.get)
-        print ( "Most patches for a given class: " + str(len(indices[maxSamples])))
-        print ( "Total number of patches: " + str(sum(lengths.values())))
+        #lengths = {k: len(v) for k, v in indices.items()}
+        #maxSamples = max(lengths, key=lengths.get)
+        #print ( "Most patches for a given class: " + str(len(indices[maxSamples])))
+        #print ( "Total number of patches: " + str(sum(lengths.values())))
         
-
-        ##### SAMPLING B ######
-        ## Alternative way fo generating pairs
-        ## Iterate over all classes
-        ## Consider all pair-wise possibilities
-        already_idxs1 = set()
-        tripletCounter = 0
-
-        while (tripletCounter < num_triplets):
-            # randomly select a class label
-            c = np.random.randint(0, n_classes)
-            while c in already_idxs1:
-                c = np.random.randint(0, n_classes)
-            already_idxs1.add(c)
-
-            if (len (already_idxs1) == n_classes):
-                already_idxs1 = set()
-
-            # take all combinations
-            for n1 in range(len(indices[c])):
-                for n2 in range (n1+1, len(indices[c])):
-                    triplets.append([indices[c][n1], indices[c][n2], c])
-                    tripletCounter += 1
-
-
-        ##### SAMPLING A ######
-        # add only unique indices in batch
-        already_idxs = set()
-        duplicateCounter = 0
         tripletCtr = 0
+        already_idxs = set()
 
-        #for x in tqdm(range(num_triplets)):
-        for x in tqdm(range(0)):
-            print ("This should NOT be printed")
-            ##if len(already_idxs) >= batch_size:
-            if tripletCtr >= batch_size:
-                already_idxs = set()
-                print ("There are " + str(duplicateCounter) + " duplicates in that batch of size " + str(tripletCtr))
-                duplicateCounter = 0
-                tripletCtr = 0
-            c = np.random.randint(0, n_classes)
-            if c in already_idxs:
-                if (unique_pairs):
-                    duplicateCounter += 1
-                else:
+        if (unique_pairs):
+            ##### SAMPLING B ######
+            ## Alternative way fo generating pairs
+            ## Iterate over all classes
+            ## Consider all pair-wise possibilities
+            while (tripletCtr < num_triplets):
+                # randomly select a class label
+                c = np.random.randint(0, n_classes)
+                while c in already_idxs:
+                    c = np.random.randint(0, n_classes)
+                already_idxs.add(c)
+
+                if (len (already_idxs) == n_classes):
+                    already_idxs = set()
+
+                # take all combinations
+                for n1 in range(len(indices[c])):
+                    for n2 in range (n1+1, len(indices[c])):
+                        triplets.append([indices[c][n1], indices[c][n2], c])
+                        tripletCtr += 1
+        else:
+            ##### SAMPLING A ######
+            # add only unique indices in batch
+            #duplicateCounter = 0
+
+            for x in tqdm(range(num_triplets)):
+               if len(already_idxs) >= batch_size:
+                    already_idxs = set()
+
+                #if tripletCtr >= batch_size:
+                    #already_idxs = set()
+                    #print ("There are " + str(duplicateCounter) + " duplicates in that batch of size " + str(tripletCtr))
+                    #duplicateCounter = 0
+                    #tripletCtr = 0
+                c = np.random.randint(0, n_classes)
+                if c in already_idxs:
+                    #if (unique_pairs):
+                    #    duplicateCounter += 1
+                    #else: 
                     while c in already_idxs:
                         c = np.random.randint(0, n_classes)
-            already_idxs.add(c)
+                already_idxs.add(c)
 
-            # find subIDs of patche in class c
-            if len(indices[c]) == 2:  # hack to speed up process
-                n1, n2 = 0, 1
-            else:
-                n1 = np.random.randint(0, len(indices[c]))
-                n2 = np.random.randint(0, len(indices[c]))
-                while n1 == n2:
+                # find subIDs of patche in class c
+                if len(indices[c]) == 2:  # hack to speed up process
+                    n1, n2 = 0, 1
+                else:
+                    n1 = np.random.randint(0, len(indices[c]))
                     n2 = np.random.randint(0, len(indices[c]))
-            triplets.append([indices[c][n1], indices[c][n2], c])
-            tripletCtr +=1
+                    while n1 == n2:
+                        n2 = np.random.randint(0, len(indices[c]))
+                triplets.append([indices[c][n1], indices[c][n2], c])
+                #tripletCtr +=1
+
         return torch.LongTensor(np.array(triplets))
 
     def __getitem__(self, index):

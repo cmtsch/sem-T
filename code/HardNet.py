@@ -193,7 +193,7 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
 
         data_a, data_p, classes = data
         if args.cuda:
-            data_a, data_p  = data_a.cuda(), data_p.cuda()
+            data_a, data_p, classes  = data_a.cuda(), data_p.cuda(), classes.cuda()
             data_a, data_p = Variable(data_a), Variable(data_p)
             out_a = model(data_a)
             out_p = model(data_p)
@@ -211,7 +211,7 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
             loss += loss_SOS(out_a, out_p)
 
         if args.MiLoss != 'none':
-            loss += loss_MI (out_a, out_p, args.MiLoss)
+            loss += loss_MI (out_a, out_p,classes, args.MiLoss)
         
         if args.decor:
             loss += CorrelationPenaltyLoss()(out_a)

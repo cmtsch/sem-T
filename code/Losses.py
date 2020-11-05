@@ -163,7 +163,7 @@ def loss_SOS (anchor, positive, use_KnearestNeighbors = True, k = 2):
     loss = torch.mean(loss)
     return loss
     
-def loss_MI (anchor, positive, MI_type):
+def loss_MI (anchor, positive, classes, MI_type):
     
     #print ("Called loss_MI with type " + MI_type)
 
@@ -171,7 +171,7 @@ def loss_MI (anchor, positive, MI_type):
     
     x=torch.cat([anchor, positive], dim=0)
     
-    labels = torch.arange(Nbatch)
+    labels = classes 
     labels = torch.cat([labels, labels], dim=0)
     labels = labels.cuda()
 
