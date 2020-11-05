@@ -37,7 +37,7 @@ class hpatches_sequence:
         for t in self.itr:
             im_path = os.path.join(base, t+'.png')
             im = cv2.imread(im_path,0)
-            self.N = im.shape[0]/65
+            self.N = int( im.shape[0]/65)
             setattr(self, t, np.split(im, self.N))
 
 class L2Norm(nn.Module):
@@ -101,13 +101,13 @@ class HardNet(nn.Module):
         x = x_features.view(x_features.size(0), -1)
         return L2Norm()(x)
 
-ww = ["../pretrained/train_yosemite/checkpoint_yosemite_no_aug.pth",
-"../pretrained/train_liberty/checkpoint_liberty_no_aug.pth",
-"../pretrained/train_notredame/checkpoint_notredame_no_aug.pth",
-"../pretrained/train_liberty_with_aug/checkpoint_liberty_with_aug.pth",
-"../pretrained/train_notredame_with_aug/checkpoint_notredame_with_aug.pth",
-"../pretrained/train_yosemite_with_aug/checkpoint_yosemite_with_aug.pth",
-"../pretrained/pretrained_all_datasets/HardNet++.pth"
+ww = [#"../pretrained/train_yosemite/checkpoint_yosemite_no_aug.pth"
+#"../pretrained/train_liberty/checkpoint_liberty_no_aug.pth",
+#"../pretrained/train_notredame/checkpoint_notredame_no_aug.pth",
+#"../pretrained/train_liberty_with_aug/checkpoint_liberty_with_aug.pth",
+#"../pretrained/train_notredame_with_aug/checkpoint_notredame_with_aug.pth",
+"../pretrained/train_yosemite_with_aug/checkpoint_yosemite_with_aug.pth"
+#"../pretrained/pretrained_all_datasets/HardNet++.pth"
 ]
 try:
     input_dir = sys.argv[1]
@@ -151,7 +151,7 @@ for model_weights in ww:
             model.eval()
             outs = []
             bs = 128;
-            n_batches = n_patches / bs + 1
+            n_batches = int(n_patches / bs + 1)
             for batch_idx in range(n_batches):
                 st = batch_idx * bs
                 if batch_idx == n_batches - 1:

@@ -2,6 +2,8 @@
 data/
 reports/
 examples/
+benchmarks/descriptors/
+benchmakrs/OutputFiles/
 lsf*
 .txt
 
