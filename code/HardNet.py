@@ -141,16 +141,26 @@ parser.add_argument('--skipInit', type=bool, default=False, metavar='SQT',
 
 args = parser.parse_args()
 
-suffix = '{}_{}_{}'.format(args.experiment_name, args.training_set, args.batch_reduce)
+#suffix = '{}_{}_{}'.format(args.experiment_name, args.training_set, args.batch_reduce)
+suffix = args.experiment_name
 
-if args.gor:
-    suffix = suffix+'_gor_alpha{:1.1f}'.format(args.alpha)
-if args.anchorswap:
-    suffix = suffix + '_as'
-if args.anchorave:
-    suffix = suffix + '_av'
-if args.fliprot:
-        suffix = suffix + '_fliprot'
+if args.uniquePairs:
+    suffix = suffix + '_B_'
+else:
+    suffix = suffix + '_A_'
+
+suffix = suffix + args.Mi_loss
+
+
+
+#if args.gor:
+#    suffix = suffix+'_gor_alpha{:1.1f}'.format(args.alpha)
+#if args.anchorswap:
+#    suffix = suffix + '_as'
+#if args.anchorave:
+#    suffix = suffix + '_av'
+#if args.fliprot:
+#        suffix = suffix + '_fliprot'
 
 triplet_flag = (args.batch_reduce == 'random_global') or args.gor
 
@@ -219,6 +229,10 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
         if args.gor:
             loss += args.alpha*global_orthogonal_regularization(out_a, out_n)
 
+        if (oldLoss != -1):
+            diff = oldLoss - loss.item()
+            print ("Loss reduced by " + str(diff))
+        oldLoss = loss.item()
             
         optimizer.zero_grad()
         loss.backward()
@@ -230,6 +244,7 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
                     epoch, batch_idx * len(data_a), len(train_loader.dataset),
                            100. * batch_idx / len(train_loader),
                     loss.item()))
+        
 
     if (args.enable_logging):
         logger.log_value('loss', loss.item()).step()
