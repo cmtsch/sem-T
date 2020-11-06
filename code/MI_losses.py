@@ -98,7 +98,7 @@ def infonce_loss(x, classes):
         torch.Tensor: Loss.
     '''
     n_samples, dim = x.size()
-    
+    print ("Size of x is " + str(list(x.size())))    
     #print ("InfoNCE loss called")
 
     # Compute similarities and mask them for positive and negative ones
@@ -106,21 +106,32 @@ def infonce_loss(x, classes):
 
     # Positive similarities
     p_mask = classes[:, None] == classes[None, :]
+    print ("Size of p_mask is " + str(list(p_mask.size())))    
     sim_p = sim[p_mask].clone().unsqueeze(1)
+    print ("Size of sim_p is " + str(list(sim_p.size())))    
     # Flat tensor of size dim_sem0² + dim_sem1² + ...
     # sim_p of size [n_samples x 1 x nsamples]
 
     # Negative similarities
     sim[p_mask] -= 10.  # mask out the positive samples
-    sim_n = sim[classes.unsqueeze(1).repeat(1, n_samples)[p_mask]]
+    helper= classes.unsqueeze(1).repeat(1, n_samples)
+    print ("Size of helper is " + str(list(helper.size())))    
+
+    #sim_n = sim[classes.unsqueeze(1).repeat(1, n_samples)[p_mask]]
+    sim_n = sim[torch.arange(0,n_samples).unsqueeze(1).repeat(1, n_samples)[p_mask]]
+    print ("Size of sim_n is " + str(list(sim_n.size())))    
+
+
     # classes unsqueeze is of size (n_samples x 1)
     # after repeat is n_samplesxn_samples
 
     # The positive score is the first element of the log softmax.
     pred_lgt = torch.cat([sim_p, sim_n], dim=1)
+    print ("Size of pred_lgt is " + str(list(pred_lgt.size())))    
     # result will be ( n_samples x 2 x n_samples )
     #Take the log_softmax of each row
     pred_log = F.log_softmax(pred_lgt, dim=1)
+    print ("Size of pred_log is " + str(list(pred_log.size())))    
     # take the mean of the first column
     loss = -pred_log[:, 0].mean()
     return loss
