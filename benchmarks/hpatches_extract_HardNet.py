@@ -106,7 +106,7 @@ ww = [#"../pretrained/train_yosemite/checkpoint_yosemite_no_aug.pth"
 #"../pretrained/train_notredame/checkpoint_notredame_no_aug.pth",
 #"../pretrained/train_liberty_with_aug/checkpoint_liberty_with_aug.pth",
 #"../pretrained/train_notredame_with_aug/checkpoint_notredame_with_aug.pth",
-"../pretrained/train_yosemite_with_aug/checkpoint_yosemite_with_aug.pth"
+#"../pretrained/train_yosemite_with_aug/checkpoint_yosemite_with_aug.pth"
 #"../pretrained/pretrained_all_datasets/HardNet++.pth"
 ]
 try:
@@ -114,6 +114,8 @@ try:
     output_dir = sys.argv[2]
     seqs = glob.glob(sys.argv[1]+'/*')
     seqs = [os.path.abspath(p) for p in seqs]   
+    savedModel = sys.argv[3]
+    ww = [savedModel]
 except:
     print('Wrong input format. Try python hpatches_extract_HardNet.py /home/ubuntu/dev/hpatches/hpatches-benchmark/data/hpatches-release /home/old-ufo/dev/hpatches/hpatches-benchmark/data/descriptors')
     sys.exit(1)

@@ -149,7 +149,7 @@ if args.uniquePairs:
 else:
     suffix = suffix + '_A_'
 
-suffix = suffix + args.Mi_loss
+suffix = suffix + args.MiLoss
 
 
 
@@ -229,10 +229,6 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
         if args.gor:
             loss += args.alpha*global_orthogonal_regularization(out_a, out_n)
 
-        if (oldLoss != -1):
-            diff = oldLoss - loss.item()
-            print ("Loss reduced by " + str(diff))
-        oldLoss = loss.item()
             
         optimizer.zero_grad()
         loss.backward()
@@ -256,6 +252,7 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
 
     torch.save({'epoch': epoch + 1, 'state_dict': model.state_dict()},
                '{}{}/checkpoint_{}.pth'.format(args.model_dir,suffix,epoch))
+    return loss.item()
 
 def test(test_loader, model, epoch, logger, logger_test_name):
     # switch to evaluate mode
@@ -348,10 +345,17 @@ def main(train_loader, test_loaders, model, logger, file_logger):
     
     start = args.start_epoch
     end = start + args.epochs
+    oldLoss = -1
     for epoch in range(start, end):
 
         # iterate over test loaders and test results
-        train(train_loader, model, optimizer1, epoch, logger, triplet_flag)
+        currLoss = train(train_loader, model, optimizer1, epoch, logger, triplet_flag)
+
+        if (oldLoss != -1):
+            diff = oldLoss - currLoss 
+            print ("Loss reduced by " + str(diff))
+        oldLoss =currLoss 
+
         for test_loader in test_loaders:
             test(test_loader['dataloader'], model, epoch, logger, test_loader['name'])
         

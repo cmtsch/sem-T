@@ -97,7 +97,7 @@ class TripletPhotoTour(dset.PhotoTour):
             #duplicateCounter = 0
 
             for x in tqdm(range(num_triplets)):
-               if len(already_idxs) >= batch_size:
+                if len(already_idxs) >= batch_size:
                     already_idxs = set()
 
                 #if tripletCtr >= batch_size:
