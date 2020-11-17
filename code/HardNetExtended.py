@@ -41,7 +41,7 @@ from Utils import str2bool
 import torch.nn as nn
 import torch.nn.functional as F
 from Datastuff import TripletPhotoTour, create_loaders
-from HardNetModel import HardNet
+from HardNetExtendedModel import HardNetExtended
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -210,8 +210,8 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
         if args.cuda:
             data_a, data_p, classes  = data_a.cuda(), data_p.cuda(), classes.cuda()
             data_a, data_p = Variable(data_a), Variable(data_p)
-            out_a = model(data_a)
-            out_p = model(data_p)
+            out_a, mi_out_a = model(data_a)
+            out_p , mi_out_p =  model(data_p)
 
         # Here hardest-in-batch aka HardNet
         loss = loss_HardNet(out_a, out_p, classes,
@@ -226,7 +226,7 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
             loss += loss_SOS(out_a, out_p)
 
         if args.MiLoss != 'none':
-            loss += loss_MI (out_a, out_p,classes, args.MiLoss)
+            loss += loss_MI (mi_out_a, mi_out_p,classes, args.MiLoss)
         
         if args.decor:
             loss += CorrelationPenaltyLoss()(out_a)
@@ -275,8 +275,8 @@ def test(test_loader, model, epoch, logger, logger_test_name):
         data_a.requires_grad_(False)
         data_p.requires_grad_(False)
 
-        out_a = model(data_a)
-        out_p = model(data_p)
+        out_a = model(data_a)[0]
+        out_p = model(data_p)[0]
         dists = torch.sqrt(torch.sum((out_a - out_p) ** 2, 1))  # euclidean distance
         distances.append(dists.data.cpu().numpy().reshape(-1,1))
         ll = label.data.cpu().numpy().reshape(-1, 1)
@@ -337,7 +337,10 @@ def main(train_loader, test_loaders, model, logger, file_logger):
     if args.cuda:
         model.cuda()
 
-    optimizer1 = create_optimizer(model.features, args.lr)
+
+    #optimizer1 = create_optimizer(model.features, args.lr)
+    optimizer1 = create_optimizer(model, args.lr)
+
 
     # optionally resume from a checkpoint
     if args.resume:
@@ -353,16 +356,10 @@ def main(train_loader, test_loaders, model, logger, file_logger):
     
     start = args.start_epoch
     end = start + args.epochs
-    #oldLoss = -1
     for epoch in range(start, end):
 
         # iterate over test loaders and test results
         currLoss = train(train_loader, model, optimizer1, epoch, logger, triplet_flag)
-
-        #if (oldLoss != -1):
-        #    diff = oldLoss - currLoss
-        #    print ("Loss reduced by " + str(diff))
-        #oldLoss =currLoss
 
         for test_loader in test_loaders:
             test(test_loader['dataloader'], model, epoch, logger, test_loader['name'])
@@ -411,7 +408,7 @@ if __name__ == '__main__':
         if not os.path.isdir(DESCS_DIR):
             os.makedirs(DESCS_DIR)
     logger, file_logger = None, None
-    model = HardNet(args.skipInit)
+    model = HardNetExtended(args.skipInit)
     if(args.enable_logging):
         from Loggers import Logger, FileLogger
         logger = Logger(LOG_DIR)

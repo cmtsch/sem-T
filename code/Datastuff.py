@@ -182,7 +182,7 @@ def create_loaders(args , dataset_names):
     transform_train = transforms.Compose([
             transforms.Lambda(np_reshape64),
             transforms.ToPILImage(),
-            transforms.RandomRotation(5,PIL.Image.BILINEAR),
+            transforms.RandomRotation(5,PIL.Image.BILINEAR, fill=(0,)),
             transforms.RandomResizedCrop(32, scale = (0.9,1.0),ratio = (0.9,1.1)),
             transforms.Resize(32),
             transforms.ToTensor()])
