@@ -22,6 +22,10 @@ import glob
 import os
 descr_name = 'HardNet'
 USE_CUDA = True
+#CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+#sys.path.append(os.path.dirname(CURRENT_DIR))
+sys.path.append("/cluster/home/cmitsch/SOSNet/")
+from sosnet_model import SOSNet32x32
   
 # all types of patches 
 tps = ['ref','e1','e2','e3','e4','e5','h1','h2','h3','h4','h5',\
@@ -123,6 +127,8 @@ except:
 w = 65
 
 model = HardNet()
+#model = SOSNet32x32 ()
+
 if USE_CUDA:
     model.cuda()
 
@@ -130,7 +136,12 @@ for model_weights in ww:
     desc_suffix = model_weights.split('/')[-1].replace('.pth', '').replace('checkpoint_', '')
     curr_desc_name = descr_name + '_' + desc_suffix
     checkpoint = torch.load(model_weights)
-    model.load_state_dict(checkpoint['state_dict'])
+    if (False):
+        ##for SOSNet?
+        model.load_state_dict(checkpoint)
+    else:
+        ##for all others
+        model.load_state_dict(checkpoint['state_dict'])
     for seq_path in seqs:
         seq = hpatches_sequence(seq_path)
         path = os.path.join(output_dir, os.path.join(curr_desc_name,seq.name))
