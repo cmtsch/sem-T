@@ -25,7 +25,9 @@ USE_CUDA = True
 #CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 #sys.path.append(os.path.dirname(CURRENT_DIR))
 sys.path.append("/cluster/home/cmitsch/SOSNet/")
+sys.path.append("/cluster/home/cmitsch/hardnet/code/")
 from sosnet_model import SOSNet32x32
+from HardNetExtendedModel import HardNetExtended
   
 # all types of patches 
 tps = ['ref','e1','e2','e3','e4','e5','h1','h2','h3','h4','h5',\
@@ -119,6 +121,8 @@ try:
     seqs = glob.glob(sys.argv[1]+'/*')
     seqs = [os.path.abspath(p) for p in seqs]   
     savedModel = sys.argv[3]
+    outputName = sys.argv[4]
+    outDim = sys.argv[5]
     ww = [savedModel]
 except:
     print('Wrong input format. Try python hpatches_extract_HardNet.py /home/ubuntu/dev/hpatches/hpatches-benchmark/data/hpatches-release /home/old-ufo/dev/hpatches/hpatches-benchmark/data/descriptors')
@@ -126,7 +130,11 @@ except:
     
 w = 65
 
-model = HardNet()
+if (outDim == 'High'):
+    model = HardNetExtended()
+else:
+    model = HardNet()
+
 #model = SOSNet32x32 ()
 
 if USE_CUDA:
@@ -144,7 +152,7 @@ for model_weights in ww:
         model.load_state_dict(checkpoint['state_dict'])
     for seq_path in seqs:
         seq = hpatches_sequence(seq_path)
-        path = os.path.join(output_dir, os.path.join(curr_desc_name,seq.name))
+        path = os.path.join(output_dir, os.path.join(outputName,seq.name))
         if not os.path.exists(path):
             os.makedirs(path)
         descr = np.zeros((seq.N,128)) # trivial (mi,sigma) descriptor
@@ -182,7 +190,10 @@ for model_weights in ww:
                     data_a = data_a.cuda()
                 data_a = Variable(data_a, volatile=True)
                 # compute output
-                out_a = model(data_a)
+                if (outDim == 'High'):
+                    out_a = model(data_a)[0]
+                else:
+                    out_a = model(data_a)
                 outs.append(out_a.data.cpu().numpy().reshape(-1, 128))
             res_desc = np.concatenate(outs)
             print(res_desc.shape, n_patches)
