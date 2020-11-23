@@ -42,6 +42,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from Datastuff import TripletPhotoTour, create_loaders
 from HardNetModel import HardNet
+from HardNetExtendedModel import HardNetExtended
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -59,8 +60,8 @@ parser.add_argument('--enable-logging',type=str2bool, default=False,
                     help='output to tensorlogger')
 parser.add_argument('--log-dir', default='data/logs/',
                     help='folder to output log')
-parser.add_argument('--model-dir', default='data/models/',
-                    help='folder to output model checkpoints')
+#parser.add_argument('--model-dir', default='data/models/',
+#                    help='folder to output model checkpoints')
 parser.add_argument('--experiment-name', default= 'liberty_train/',
                     help='experiment path')
 parser.add_argument('--training-set', default= 'liberty',
@@ -136,6 +137,11 @@ parser.add_argument('--MiLoss', default= 'JSD',
                     help='Other options: JSD, DV, infoNCE')
 parser.add_argument('--uniquePairs', type=str2bool, default=True,
                     help='in one training batch there is at most one pair corresponding to the same real world oject')
+parser.add_argument('--highDim', type=str2bool, default=False,
+                    help='indicates wether we want to use a high-dimensional embedding')
+parser.add_argument('--myAugmentation', default= 'N',
+                    help='Other options: O,R,N')
+
 
 parser.add_argument('--skipInit', type=str2bool, default=False,
                     help='Skip Initialization of weights, for quick debug runs')
@@ -145,13 +151,32 @@ args = parser.parse_args()
 
 #suffix = '{}_{}_{}'.format(args.experiment_name, args.training_set, args.batch_reduce)
 suffix = args.experiment_name
+suffix = suffix + '_'
 
+# Sampline A is the original sampling, B is the new one which allows more than on pair per class
 if args.uniquePairs:
-    suffix = suffix + '_A_'
+    suffix = suffix + 'A'
 else:
-    suffix = suffix + '_B_'
+    suffix = suffix + 'B'
 
+#this variable takes on values O (old), R (Rémi), N (none)
+if (args.myAugmentation == 'O'):
+    args.augmentation = True
+else:
+    args.augmentation = False
+
+suffix = suffix + args.myAugmentation
+
+# indicates wether we want to use a high-dimensional embedding
+if args.highDim:
+    suffix = suffix + 'H'
+else:
+    suffix = suffix + 'L'
+
+suffix = suffix + '_'
 suffix = suffix + args.MiLoss
+
+myModelDir = 'data/models/'+args.experiment_name+'/'
 
 
 
@@ -210,8 +235,14 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
         if args.cuda:
             data_a, data_p, classes  = data_a.cuda(), data_p.cuda(), classes.cuda()
             data_a, data_p = Variable(data_a), Variable(data_p)
-            out_a = model(data_a)
-            out_p = model(data_p)
+            if (args.highDim):
+                out_a, mi_out_a = model(data_a)
+                out_p , mi_out_p =  model(data_p)
+            else:
+                out_a = model(data_a)
+                out_p = model(data_p)
+                mi_out_a = out_a
+                mi_out_p = out_p
 
         # Here hardest-in-batch aka HardNet
         loss = loss_HardNet(out_a, out_p, classes,
@@ -220,14 +251,17 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
                         anchor_ave=args.anchorave,
                         batch_reduce = args.batch_reduce,
                         loss_type = args.loss)
+        loss_triplet = loss.item()
         
         if args.lossSOS:
             # do we need the classes arguemnt here
             loss += loss_SOS(out_a, out_p)
 
         if args.MiLoss != 'none':
-            loss += loss_MI (out_a, out_p,classes, args.MiLoss)
-        
+            #loss += loss_MI (out_a, out_p,classes, args.MiLoss)
+            lossMI = loss_MI (mi_out_a, mi_out_p,classes, args.MiLoss)
+            loss += lossMI
+
         if args.decor:
             loss += CorrelationPenaltyLoss()(out_a)
             
@@ -240,7 +274,9 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
         optimizer.step()
         adjust_learning_rate(optimizer)
         if batch_idx % args.log_interval == 0:
-            writer.add_scalar('Loss/train', loss.item(), batch_idx + epoch*len(train_loader))
+            writer.add_scalar('Loss/train_total', loss.item(), batch_idx + epoch*len(train_loader))
+            writer.add_scalar('Loss/train_triplet', loss_triplet, batch_idx + epoch*len(train_loader))
+            writer.add_scalar('Loss/train_MI', lossMI.item(), batch_idx + epoch*len(train_loader))
             pbar.set_description(
                 'Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                     epoch, batch_idx * len(data_a), len(train_loader.dataset),
@@ -252,12 +288,12 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
         logger.log_value('loss', loss.item()).step()
 
     try:
-        os.stat('{}{}'.format(args.model_dir,suffix))
+        os.stat('{}{}'.format(myModelDir,suffix))
     except:
-        os.makedirs('{}{}'.format(args.model_dir,suffix))
+        os.makedirs('{}{}'.format(myModelDir,suffix))
 
     torch.save({'epoch': epoch + 1, 'state_dict': model.state_dict()},
-               '{}{}/checkpoint_{}.pth'.format(args.model_dir,suffix,epoch))
+               '{}{}/checkpoint_{}.pth'.format(myModelDir,suffix,epoch))
     return loss.item()
 
 def test(test_loader, model, epoch, logger, logger_test_name):
@@ -275,8 +311,12 @@ def test(test_loader, model, epoch, logger, logger_test_name):
         data_a.requires_grad_(False)
         data_p.requires_grad_(False)
 
-        out_a = model(data_a)
-        out_p = model(data_p)
+        if (args.highDim):
+            out_a = model(data_a)[0]
+            out_p = model(data_p)[0]
+        else:
+            out_a = model(data_a)
+            out_p = model(data_p)
         dists = torch.sqrt(torch.sum((out_a - out_p) ** 2, 1))  # euclidean distance
         distances.append(dists.data.cpu().numpy().reshape(-1,1))
         ll = label.data.cpu().numpy().reshape(-1, 1)
@@ -411,7 +451,11 @@ if __name__ == '__main__':
         if not os.path.isdir(DESCS_DIR):
             os.makedirs(DESCS_DIR)
     logger, file_logger = None, None
-    model = HardNet(args.skipInit)
+    if (args.highDim):
+        model = HardNetExtended(args.skipInit)
+    else:
+        model = HardNet(args.skipInit)
+
     if(args.enable_logging):
         from Loggers import Logger, FileLogger
         logger = Logger(LOG_DIR)

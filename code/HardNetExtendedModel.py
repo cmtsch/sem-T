@@ -26,11 +26,11 @@ from Utils import str2bool
 import torch.nn as nn
 import torch.nn.functional as F
 
-class HardNet(nn.Module):
+class HardNetExtended(nn.Module):
     """HardNet model definition
     """
     def __init__(self, skipInit=False):
-        super(HardNet, self).__init__()
+        super(HardNetExtended, self).__init__()
         self.features = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=3, padding=1, bias = False),
             nn.BatchNorm2d(32, affine=False),
@@ -56,6 +56,7 @@ class HardNet(nn.Module):
         )
         self.featuresMI = nn.Sequential(
             nn.Linear(128,512,bias=False),
+            #nn.BatchNorm2d(512, affine=False),
             nn.ReLU(),
             nn.Linear(512,2048, bias=False)
         )
@@ -76,7 +77,9 @@ class HardNet(nn.Module):
         x_features = self.features(self.input_norm(input))
         x = x_features.view(x_features.size(0), -1)
         hardnet_output = L2Norm()(x)
-        mi_output = self.featuresMI(hardnet_output)
+
+        tempVal = self.featuresMI(x)
+        mi_output = L2Norm()(tempVal)
         return hardnet_output, mi_output
 
 def weights_init(m):

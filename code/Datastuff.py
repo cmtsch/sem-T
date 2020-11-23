@@ -86,11 +86,33 @@ class TripletPhotoTour(dset.PhotoTour):
                 if (len (already_idxs) == n_classes):
                     already_idxs = set()
 
+                # Goal: Have ~100 pairs for each class
+                # This is achieved by using data augmentation
+                # Alg
+                # We count how many pairs we added pair-wise e.g. 40
+                # We 'fill up' the remaining 60 by randomly sampling
+                # indices
+                # aug1 = np.random.randint(0, len(indices[c]) )
+                # aug2 = np.random.randint(0, len(indices[c]) )
+                # Then we apply some random transformations to those patches and add that pair
+
                 # take all combinations
+                classCtr= 0
                 for n1 in range(len(indices[c])):
                     for n2 in range (n1+1, len(indices[c])):
                         triplets.append([indices[c][n1], indices[c][n2], c])
+                        classCtr += 1
                         tripletCtr += 1
+
+                ## New stuff
+                #while ( classCtr < 128):
+                #    aug1 = np.random.randint(0, len(indices[c]) )
+                #    aug2 = np.random.randint(0, len(indices[c]) )
+                #    patch1 = do
+                #    triplets.append([indices[c][aug1], indices[c][aug2], c])
+                #    classCtr += 1
+                #    tripletCtr += 1
+
         else:
             ##### SAMPLING A ######
             # add only unique indices in batch
@@ -133,6 +155,7 @@ class TripletPhotoTour(dset.PhotoTour):
                 img = self.transform(img.numpy())
             return img
 
+        # If this is a test set, just return patches and bool value (match / no match)
         if not self.train:
             m = self.matches[index]
             img1 = transform_img(self.data[m[0]])
