@@ -108,7 +108,7 @@ parser.add_argument('--alpha', type=float, default=1.0, metavar='ALPHA',
                     help='gor parameter')
 parser.add_argument('--lr', type=float, default=10.0, metavar='LR',
                     help='learning rate (default: 10.0. Yes, ten is not typo)')
-parser.add_argument('--fliprot', type=str2bool, default=True,
+parser.add_argument('--fliprot', type=str2bool, default=False,
                     help='turns on flip and 90deg rotation augmentation')
 parser.add_argument('--augmentation', type=str2bool, default=False,
                     help='turns on shift and small scale rotation augmentation')

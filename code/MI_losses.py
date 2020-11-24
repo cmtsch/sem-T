@@ -72,20 +72,30 @@ def fenchel_dual_loss(x, classes, measure=None):
                     measure, supported_measures))
         return En
 
+    # 2048, 128
     n_samples, dim = x.size()
 
     # Similarity matrix mixing positive and negative samples
+    # 2048x2048 matrix
     sim = x @ x.t()
 
     # Compute the positive and negative score
     E_pos = get_positive_expectation(sim, measure)
     E_neg = get_negative_expectation(sim, measure)
+    # Each is a 2048x2048 matrix
 
     # Mask positive and negative terms for positive and negative parts of loss
     p_mask = (classes[:, None] == classes[None, :]).float()
+    # 2048 x 2048 matrix, is 1 if two samples belong to the same class, 1 on diagonal, symmetric
     n_mask = 1 - p_mask
+
+    # added by me: set diagonal to zero
+    p_mask = p_mask -  torch.diag(torch.ones(n_samples)).cuda()
+
+    # 2048 x 2048 matrix, is 1 if two samples do NOT belong to the same class, 0 on diagonal, symmetric
     E_pos = (E_pos * p_mask).sum() / p_mask.sum()
     E_neg = (E_neg * n_mask).sum() / n_mask.sum()
+
     return E_neg - E_pos
 
 
@@ -106,11 +116,16 @@ def infonce_loss(x, classes):
 
     # Positive similarities
     p_mask = classes[:, None] == classes[None, :]
+    # Probably a matrix of size 2048x 2048
+
     #print ("Size of p_mask is " + str(list(p_mask.size())))
     sim_p = sim[p_mask].clone().unsqueeze(1)
-    #print ("Size of sim_p is " + str(list(sim_p.size())))
+    print ("Size of sim_p is " + str(list(sim_p.size())))
     # Flat tensor of size dim_sem0² + dim_sem1² + ...
-    # sim_p of size [n_samples x 1 x nsamples]
+
+    # All positive entries tensor of dimension e.g. 163840 x 1
+    # where 128 * 128 * 10 = 163840
+    # maybe it is 256 * 256 * 10 = 655360
 
     # Negative similarities
     sim[p_mask] -= 10.  # mask out the positive samples
@@ -119,19 +134,21 @@ def infonce_loss(x, classes):
 
     #sim_n = sim[classes.unsqueeze(1).repeat(1, n_samples)[p_mask]]
     sim_n = sim[torch.arange(0,n_samples).unsqueeze(1).repeat(1, n_samples)[p_mask]]
-    #print ("Size of sim_n is " + str(list(sim_n.size())))
+    # tensor of dimension 163840 x 1920
+    # where 1920 = 2048 - 128
 
-
-    # classes unsqueeze is of size (n_samples x 1)
-    # after repeat is n_samplesxn_samples
+    print ("Size of sim_n is " + str(list(sim_n.size())))
 
     # The positive score is the first element of the log softmax.
     pred_lgt = torch.cat([sim_p, sim_n], dim=1)
+    # pred_lgt will be of size 163840 x 1921
     #print ("Size of pred_lgt is " + str(list(pred_lgt.size())))
-    # result will be ( n_samples x 2 x n_samples )
+
     #Take the log_softmax of each row
+    # Calculates a value for each column in that row, but we are only interested in the first value
     pred_log = F.log_softmax(pred_lgt, dim=1)
     #print ("Size of pred_log is " + str(list(pred_log.size())))
+
     # take the mean of the first column
     loss = -pred_log[:, 0].mean()
     return loss

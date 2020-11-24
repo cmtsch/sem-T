@@ -45,10 +45,34 @@ class TripletPhotoTour(dset.PhotoTour):
 
         if self.train:
             print('Generating {} triplets'.format(self.n_triplets))
-            self.triplets = self.generate_triplets(self.labels, self.n_triplets, self.batch_size, self.unique_pairs)
+            self.triplets = self.generate_triplets(self.labels, self.n_triplets, self.batch_size, self.unique_pairs,
+                                                   self.data, self.transform)
 
     @staticmethod
-    def generate_triplets(labels, num_triplets, batch_size, unique_pairs):
+    def generate_triplets(labels, num_triplets, batch_size, unique_pairs, data,transform):
+
+        def transform_img(img):
+            if transform is not None:
+                prob = random.random()
+                if (prob < 0.33):
+                    img = transform[0](img.numpy())
+                elif (prob < 0.66):
+                    # apply gaussian noise
+                    img = img.numpy()
+                    stddev = np.random.uniform(5,95)
+                    noise = np.random.normal(0., stddev, size=img.shape)
+                    noisy_image = (img + noise).clip(0.,255.).astype(np.float32)
+                    img = transform[1](noisy_image)
+                else:
+                    img = img.numpy()
+                    strength = np.random.uniform(0.5,1.5)
+                    contrasted_img = img.copy()
+                    mean = np.mean(contrasted_img)
+                    contrasted_img = (contrasted_img-mean) * strength + mean
+                    contrasted_img = contrasted_img.clip(0.,255.).astype(np.float32)
+                    img = transform[1](contrasted_img)
+            return img
+
         def create_indices(_labels):
             inds = dict()
             for idx, ind in enumerate(_labels):
@@ -70,13 +94,15 @@ class TripletPhotoTour(dset.PhotoTour):
         
         tripletCtr = 0
         already_idxs = set()
+        myBatchSize = 1024
+        myNumClasses =10
 
-        if (unique_pairs):
-            ##### SAMPLING B ######
-            ## Alternative way fo generating pairs
-            ## Iterate over all classes
-            ## Consider all pair-wise possibilities
+        if (unique_pairs == False):
+            ##### SAMPLING B ###### uniquePairs == False
             while (tripletCtr < num_triplets):
+
+                #while (batchCtr < myBatchSize):
+                #batch1 = torch.tensor([myBatchSize, 32, 32])
                 # randomly select a class label
                 c = np.random.randint(0, n_classes)
                 while c in already_idxs:
@@ -85,38 +111,35 @@ class TripletPhotoTour(dset.PhotoTour):
 
                 if (len (already_idxs) == n_classes):
                     already_idxs = set()
-
-                # Goal: Have ~100 pairs for each class
-                # This is achieved by using data augmentation
-                # Alg
-                # We count how many pairs we added pair-wise e.g. 40
-                # We 'fill up' the remaining 60 by randomly sampling
-                # indices
-                # aug1 = np.random.randint(0, len(indices[c]) )
-                # aug2 = np.random.randint(0, len(indices[c]) )
-                # Then we apply some random transformations to those patches and add that pair
-
                 # take all combinations
                 classCtr= 0
                 for n1 in range(len(indices[c])):
                     for n2 in range (n1+1, len(indices[c])):
-                        triplets.append([indices[c][n1], indices[c][n2], c])
+                        # Here we do not necessarily need to transform, could just use original patches
+                        patch1 = transform_img(data[indices[c][n1]])
+                        patch2 = transform_img(data[indices[c][n2]])
+                        triplets.append([patch1, patch2, c])
+                        #triplets.append([indices[c][n1], indices[c][n2], c])
                         classCtr += 1
                         tripletCtr += 1
 
-                ## New stuff
-                #while ( classCtr < 128):
-                #    aug1 = np.random.randint(0, len(indices[c]) )
-                #    aug2 = np.random.randint(0, len(indices[c]) )
-                #    patch1 = do
-                #    triplets.append([indices[c][aug1], indices[c][aug2], c])
-                #    classCtr += 1
-                #    tripletCtr += 1
+                # New stuff
+                while ( classCtr < 64):
+                    aug1 = np.random.randint(0, len(indices[c]) )
+                    aug2 = np.random.randint(0, len(indices[c]) )
+
+                    patch1 = transform_img(data[indices[c][n1]])
+                    patch2 = transform_img(data[indices[c][n2]])
+                    #patch1 = do_aug(data(indices[c][n1]))
+                    #patch2 = do_aug(data(indices[c][n2]))
+
+                    triplets.append([patch1, patch2, c])
+                    #triplets.append([indices[c][aug1], indices[c][aug2], c])
+                    classCtr += 1
+                    tripletCtr += 1
 
         else:
-            ##### SAMPLING A ######
-            # add only unique indices in batch
-            #duplicateCounter = 0
+            ##### SAMPLING A ###### uniquePairs == True
 
             for x in tqdm(range(num_triplets)):
                 if len(already_idxs) >= batch_size:
@@ -144,10 +167,14 @@ class TripletPhotoTour(dset.PhotoTour):
                     n2 = np.random.randint(0, len(indices[c]))
                     while n1 == n2:
                         n2 = np.random.randint(0, len(indices[c]))
-                triplets.append([indices[c][n1], indices[c][n2], c])
+                #triplets.append([indices[c][n1], indices[c][n2], c])
+                patch1 = transform_img(data[indices[c][n1]])
+                patch2 = transform_img(data[indices[c][n2]])
+                triplets.append([patch1, patch2, c])
                 #tripletCtr +=1
 
-        return torch.LongTensor(np.array(triplets))
+        #return torch.LongTensor(np.array(triplets))
+        return triplets
 
     def __getitem__(self, index):
         def transform_img(img):
@@ -163,10 +190,13 @@ class TripletPhotoTour(dset.PhotoTour):
             return img1, img2, m[2]
 
         t = self.triplets[index]
-        a, p, label = self.data[t[0]], self.data[t[1]], t[2]
+        #a, p, label = self.data[t[0]], self.data[t[1]], t[2]
+        a, p, label = t[0], t[1], t[2]
 
-        img_a = transform_img(a)
-        img_p = transform_img(p)
+        #img_a = transform_img(a)
+        #img_p = transform_img(p)
+        img_a = a
+        img_p = p
 
         # transform images if required
         if self.fliprot:
@@ -183,7 +213,8 @@ class TripletPhotoTour(dset.PhotoTour):
 
     def __len__(self):
         if self.train:
-            return self.triplets.size(0)
+            return len(self.triplets)
+            #return self.triplets.size(0)
         else:
             return self.matches.size(0)
 
@@ -202,18 +233,26 @@ def create_loaders(args , dataset_names):
             transforms.ToPILImage(),
             transforms.Resize(32),
             transforms.ToTensor()])
-    transform_train = transforms.Compose([
+    transform_train1 = transforms.Compose([
             transforms.Lambda(np_reshape64),
             transforms.ToPILImage(),
             transforms.RandomRotation(5,PIL.Image.BILINEAR, fill=(0,)),
-            transforms.RandomResizedCrop(32, scale = (0.9,1.0),ratio = (0.9,1.1)),
+            transforms.RandomResizedCrop(32, scale=(0.9, 1.0), ratio=(0.9, 1.1)),
             transforms.Resize(32),
             transforms.ToTensor()])
+    transform_train2 = transforms.Compose([
+        transforms.Lambda(np_reshape64),
+        transforms.ToPILImage(),
+        #jtransforms.RandomRotation(5, PIL.Image.BILINEAR, fill=(0,)),
+        #transforms.RandomResizedCrop(32, scale=(0.9, 1.0), ratio=(0.9, 1.1)),
+        transforms.Resize(32),
+        transforms.ToTensor()])
     transform = transforms.Compose([
             transforms.Lambda(cv2_scale),
             transforms.Lambda(np_reshape),
             transforms.ToTensor(),
             transforms.Normalize((args.mean_image,), (args.std_image,))])
+    transform_train = [transform_train1, transform_train2]
     if not args.augmentation:
         transform_train = transform
         transform_test = transform
