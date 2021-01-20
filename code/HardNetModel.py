@@ -69,6 +69,9 @@ class HardNet(nn.Module):
     
     def forward(self, input):
         x_features = self.features(self.input_norm(input))
+        # Use sequential checkpoints
+        #x_features = torch.utils.checkpoint.checkpoint_sequential(self.features, 3, self.input_norm(input))
+
         x = x_features.view(x_features.size(0), -1)
         return L2Norm()(x)
 

@@ -3,6 +3,7 @@ import torch.nn as nn
 import sys
 import numpy as np
 import MI_losses
+import time
 
 
 def distance_matrix_vector(anchor, positive):
@@ -30,6 +31,35 @@ def distance_vectors_pairwise(anchor, positive, negative = None):
         return d_a_p, d_a_n, d_p_n
     return d_a_p
 
+def loss_Rho(anchor, positive, classes):
+
+    Rs = []
+    means = []
+
+    start1 = time.time()
+    allClasses = torch.unique(classes)
+
+    # Tech consulting IBM, Accenture,
+    if ( classes.size()[0] == allClasses.size()[0] ):
+        #short cut
+        R_intra = torch.mean( torch.norm(anchor + positive , dim=1) / 2. )
+        R_inter = torch.mean( torch.norm( (anchor + positive)/2. , dim=1) )
+        Rho = R_inter / R_intra
+        return  Rho
+
+    for label in allClasses:
+        start1 = time.time()
+        help1 = torch.sum(anchor[ classes== label, :], dim=0)
+        help2 = torch.sum(positive[ classes== label, :], dim=0)
+        N = (classes == label).sum() * 2
+        Rs.append( (torch.norm(help1 + help2) / N))
+        means.append( (help1 + help2)/N)
+
+    R_intra = sum(Rs) / len(Rs)
+    R_inter = torch.norm(sum(means)) / len(means)
+    Rho = R_inter / R_intra
+    return Rho
+
 def loss_HardNet(anchor, positive, classes, anchor_swap = False, anchor_ave = False,\
         margin = 1.0, batch_reduce = 'min', loss_type = "triplet_margin"):
     """HardNet margin loss - calculates loss based on distance matrix based on positive distance and closest negative distance.
@@ -47,8 +77,14 @@ def loss_HardNet(anchor, positive, classes, anchor_swap = False, anchor_ave = Fa
 
     ## New: we need to filter out the ones that belong to the same class
     p_mask = (classes[:, None] == classes[None, :]).float()
+    #print ("Numer of same classes is ")
+    #print (torch.sum(p_mask))
     p_mask = p_mask.type_as(dist_matrix) * 42
     dist_without_min_on_diag = dist_matrix+p_mask
+
+    mystery_mask = dist_without_min_on_diag.le(0.008).float()
+    mystery_mask = mystery_mask.type_as(dist_without_min_on_diag)*42
+    dist_without_min_on_diag = dist_without_min_on_diag+mystery_mask
 
 
     ##dist_without_min_on_diag = dist_matrix+eye*10
@@ -113,6 +149,7 @@ def loss_HardNet(anchor, positive, classes, anchor_swap = False, anchor_ave = Fa
         sys.exit(1)
     loss = torch.mean(loss)
     return loss
+
 
 def chrisTest():
     anchors = torch.randn(5,3)

@@ -30,11 +30,12 @@ import os
 from tqdm import tqdm
 import numpy as np
 import random
+import time
 import cv2
 import copy
 import PIL
 from EvalMetrics import ErrorRateAt95Recall
-from Losses import loss_HardNet, global_orthogonal_regularization, loss_SOS, loss_MI, CorrelationPenaltyLoss
+from Losses import loss_HardNet, global_orthogonal_regularization, loss_SOS, loss_MI, CorrelationPenaltyLoss, loss_Rho
 from W1BS import w1bs_extract_descs_and_save
 from Utils import L2Norm, cv2_scale, np_reshape
 from Utils import str2bool
@@ -135,12 +136,13 @@ parser.add_argument('--lossSOS', type=str2bool, default=False, metavar='SOS',
                     help='use the Second Order Similarity loss')
 parser.add_argument('--MiLoss', default= 'JSD',
                     help='Other options: JSD, DV, infoNCE')
-parser.add_argument('--uniquePairs', type=str2bool, default=True,
-                    help='in one training batch there is at most one pair corresponding to the same real world oject')
+parser.add_argument('--uniquePairs', default='Unique',
+                    help='Options: Unique, NonUnique, Mixed')
 parser.add_argument('--highDim', type=str2bool, default=False,
                     help='indicates wether we want to use a high-dimensional embedding')
 parser.add_argument('--myAugmentation', default= 'N',
                     help='Other options: O,R,N')
+
 
 
 parser.add_argument('--skipInit', type=str2bool, default=False,
@@ -154,10 +156,14 @@ suffix = args.experiment_name
 suffix = suffix + '_'
 
 # Sampline A is the original sampling, B is the new one which allows more than on pair per class
-if args.uniquePairs:
+if args.uniquePairs == 'Unique':
     suffix = suffix + 'A'
-else:
+elif args.uniquePairs == 'NonUnique':
     suffix = suffix + 'B'
+elif args.uniquePairs == 'Mixed':
+    suffix = suffix + 'M'
+else:
+    raise NotImplementedError('Unknown argument of uniquePairs argument')
 
 #this variable takes on values O (old), R (Rémi), N (none)
 if (args.myAugmentation == 'O'):
@@ -231,7 +237,10 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
     pbar = tqdm(enumerate(train_loader))
     for batch_idx, data in pbar:
 
-        data_a, data_p, classes = data
+        data_a, data_p, classes, uniqueFlag = data
+        data_a = data_a[0]
+        data_p = data_p[0]
+        classes = classes[0]
         if args.cuda:
             data_a, data_p, classes  = data_a.cuda(), data_p.cuda(), classes.cuda()
             data_a, data_p = Variable(data_a), Variable(data_p)
@@ -245,41 +254,52 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
                 mi_out_p = out_p
 
         # Here hardest-in-batch aka HardNet
-        loss = loss_HardNet(out_a, out_p, classes,
+        if uniqueFlag == True:
+            loss_triplet = loss_HardNet(out_a, out_p, classes,
                         margin=args.margin,
                         anchor_swap=args.anchorswap,
                         anchor_ave=args.anchorave,
                         batch_reduce = args.batch_reduce,
                         loss_type = args.loss)
-        loss_triplet = loss.item()
-        
+            loss = loss_triplet
+            lossMI = torch.tensor(0.0)
+        else:
+            loss_triplet = torch.tensor(0.0)
+            if args.MiLoss in ['JSD', 'DV', 'infoNCE']:
+                lossMI = loss_MI (mi_out_a, mi_out_p,classes, args.MiLoss)
+                loss = lossMI
+
         if args.lossSOS:
             # do we need the classes arguemnt here
             loss += loss_SOS(out_a, out_p)
 
-        if args.MiLoss != 'none':
-            #loss += loss_MI (out_a, out_p,classes, args.MiLoss)
-            lossMI = loss_MI (mi_out_a, mi_out_p,classes, args.MiLoss)
-            loss += lossMI
+        if args.MiLoss == 'Rho':
+            start = time.time()
+            loss += loss_Rho(out_a, out_p, classes)
+            end = time.time()
+            duration = end - start
+            print ("Calculating Rho loss for a batch took this time: " + str(duration))
+
+
 
         if args.decor:
             loss += CorrelationPenaltyLoss()(out_a)
-            
+
         if args.gor:
             loss += args.alpha*global_orthogonal_regularization(out_a, out_n)
 
-            
+
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         adjust_learning_rate(optimizer)
         if batch_idx % args.log_interval == 0:
             writer.add_scalar('Loss/train_total', loss.item(), batch_idx + epoch*len(train_loader))
-            writer.add_scalar('Loss/train_triplet', loss_triplet, batch_idx + epoch*len(train_loader))
+            writer.add_scalar('Loss/train_triplet', loss_triplet.item(), batch_idx + epoch*len(train_loader))
             writer.add_scalar('Loss/train_MI', lossMI.item(), batch_idx + epoch*len(train_loader))
             pbar.set_description(
                 'Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    epoch, batch_idx * len(data_a), len(train_loader.dataset),
+                    epoch, batch_idx * len(data_a), len(train_loader.dataset)*len(data_a),
                            100. * batch_idx / len(train_loader),
                     loss.item()))
         
@@ -437,7 +457,7 @@ def main(train_loader, test_loaders, model, logger, file_logger):
                                          methods=["SNN_ratio"],
                                          descs_to_draw=[desc_name])
         #randomize train loader batches
-        train_loader, test_loaders2 = create_loaders(args, dataset_names)
+        #train_loader, test_loaders2 = create_loaders(args, dataset_names)
 
 
 if __name__ == '__main__':
