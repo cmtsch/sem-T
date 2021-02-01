@@ -1,33 +1,14 @@
 from __future__ import division, print_function
-import sys
-from copy import deepcopy
-import math
-import argparse
 import torch
 import torch.nn.init
-import torch.nn as nn
-import torch.optim as optim
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
-from torch.autograd import Variable
-import torch.backends.cudnn as cudnn
-import os
-from tqdm import tqdm
 import numpy as np
 import random
-import cv2
 import copy
 import PIL
 import HardNetModel
-from EvalMetrics import ErrorRateAt95Recall
-from Losses import loss_HardNet, global_orthogonal_regularization, loss_SOS, loss_MI, CorrelationPenaltyLoss
-from W1BS import w1bs_extract_descs_and_save
 from Utils import L2Norm, cv2_scale, np_reshape
-from Utils import str2bool
-import torch.nn as nn
-import torch.nn.functional as F
-
-
 
 class TripletPhotoTour(dset.PhotoTour):
     """
@@ -35,7 +16,7 @@ class TripletPhotoTour(dset.PhotoTour):
     note: a triplet is composed by a pair of matching images and one of
     different class.
     """
-    def __init__(self, train=True, transform=None, n_triplets = 50000, fliprot = False, batch_size = None, uniquePairs=True, transformFlag = False,  *arg, **kw):
+    def __init__(self, train=True, transform=None, n_triplets = 50000, fliprot = False, batch_size = None, samplesPerClass=2, transformFlag = False,  *arg, **kw):
         super(TripletPhotoTour, self).__init__(*arg, **kw)
         self.transform = transform
         self.train = train
@@ -43,17 +24,15 @@ class TripletPhotoTour(dset.PhotoTour):
         self.fliprot = fliprot
         #self.batch_size = batch_size
         self.batch_size = 1
-        self.unique_pairs = uniquePairs
 
         if self.train:
             print('Generating {} triplets'.format(self.n_triplets))
-            self.triplets = self.generate_triplets(self.labels, self.n_triplets, batch_size, self.unique_pairs,
+            self.triplets = self.generate_triplets(self.labels, self.n_triplets, batch_size, samplesPerClass,
                                                    self.data, self.transform, transformFlag)
 
     @staticmethod
-    def generate_triplets(labels, num_triplets, batch_size, unique_pairs, data,transform, transformFlag):
+    def generate_triplets(labels, num_triplets, batch_size, samplesPerClass, data,transform, transformFlag):
 
-        patchesPerClass = 64
 
         def transform_img(img):
             img = img.numpy()
@@ -146,7 +125,7 @@ class TripletPhotoTour(dset.PhotoTour):
                     for n1 in range(len(indices[c])):
                         for n2 in range(n1 + 1, len(indices[c])):
                             # Here we do not necessarily need to transform, could just use original patches
-                            if classCtr < patchesPerClass:
+                            if classCtr < samplesPerClass:
                                 tmpPathc = transform_img(data[indices[c][n1]])
                                 # print (tmpPathc.size())
                                 batch1[batchCtr, :, :, :] = transform_img(data[indices[c][n1]])
@@ -156,7 +135,7 @@ class TripletPhotoTour(dset.PhotoTour):
                                 classCtr += 1
 
                     # New stuff
-                    while (classCtr < patchesPerClass):
+                    while (classCtr < samplesPerClass):
                         aug1 = np.random.randint(0, len(indices[c]))
                         aug2 = np.random.randint(0, len(indices[c]))
                         batch1[batchCtr, :, :, :] = transform_img(data[indices[c][aug1]])
@@ -166,7 +145,7 @@ class TripletPhotoTour(dset.PhotoTour):
                         batchCtr += 1
             return batch1, batch2, classes
 
-        def nonUniqueBatch():
+        def nonUniqueBatch(samplesPerClass):
             batchCtr=0
             batch1 = torch.empty(batch_size, 1, 32, 32)
             batch2 = torch.empty(batch_size, 1, 32, 32)
@@ -186,23 +165,23 @@ class TripletPhotoTour(dset.PhotoTour):
                 for n1 in range(len(indices[c])):
                     for n2 in range (n1+1, len(indices[c])):
                         # Here we do not necessarily need to transform, could just use original patches
-                        if classCtr < patchesPerClass:
+                        if classCtr < samplesPerClass:
                             tmpPathc = transform_img(data[indices[c][n1]])
                             #print (tmpPathc.size())
                             batch1[batchCtr,:,:,:] = transform_img(data[indices[c][n1]])
                             batch2[batchCtr,:, :, :] = transform_img(data[indices[c][n2]])
                             classes[batchCtr] = c
                             batchCtr +=1
-                            classCtr += 1
+                            classCtr += 2
 
                 # New stuff
-                while ( classCtr < patchesPerClass):
+                while ( classCtr < samplesPerClass):
                     aug1 = np.random.randint(0, len(indices[c]) )
                     aug2 = np.random.randint(0, len(indices[c]) )
                     batch1[batchCtr, :,:, :] = transform_img(data[indices[c][aug1]])
                     batch2[batchCtr, :,:, :] = transform_img(data[indices[c][aug2]])
                     classes[batchCtr] = c
-                    classCtr += 1
+                    classCtr += 2
                     batchCtr += 1
             return batch1, batch2, classes
 
@@ -240,12 +219,12 @@ class TripletPhotoTour(dset.PhotoTour):
         tripletCtr = 0
         chooser = 0
 
-        if (unique_pairs == 'Unique'):
+        if (samplesPerClass == 2):
             uniqueFlag = True
         else:
             uniqueFlag = False
 
-        if True:
+        if False:
             model = HardNetModel.HardNet()
             # load a specific set of pretrained parameters
             print("Trying to load pre-trained model")
@@ -258,19 +237,14 @@ class TripletPhotoTour(dset.PhotoTour):
 
         while (tripletCtr < num_triplets - batch_size):
 
-            # Toggle the flag
-            if (unique_pairs == 'Mixed'):
-                uniqueFlag = not uniqueFlag
+            #print("Now generating a hardPairsBatch")
+            #batch1, batch2, classes = hardPairsBatch(partnerClasses)
+            #print("Done generating a hardPairsBatch")
 
-
-            print("Now generating a hardPairsBatch")
-            batch1, batch2, classes = hardPairsBatch(partnerClasses)
-            print("Done generating a hardPairsBatch")
-
-            #if (uniqueFlag):
-            #    batch1, batch2, classes = uniqueBatch()
-            #else:
-            #    batch1, batch2, classes = nonUniqueBatch()
+            if (uniqueFlag):
+                batch1, batch2, classes = uniqueBatch()
+            else:
+                batch1, batch2, classes = nonUniqueBatch(samplesPerClass)
 
             triplets.append([batch1, batch2, classes, uniqueFlag])
             tripletCtr += batch_size
@@ -283,7 +257,6 @@ class TripletPhotoTour(dset.PhotoTour):
             if self.transform is not None:
                 img = self.transform(img.numpy())
             return img
-
         # If this is a test set, just return patches and bool value (match / no match)
         if not self.train:
             m = self.matches[index]
@@ -293,22 +266,8 @@ class TripletPhotoTour(dset.PhotoTour):
 
         t = self.triplets[index]
         a, p, label, uniqueFlag = t[0], t[1], t[2], t[3]
-
         img_a = a
         img_p = p
-
-        # transform images if required
-        #if self.fliprot:
-        #    do_flip = random.random() > 0.5
-        #    do_rot = random.random() > 0.5
-        #    if do_rot:
-        #        img_a = img_a.permute(0,2,1)
-        #        img_p = img_p.permute(0,2,1)
-        #    if do_flip:
-        #        img_a = torch.from_numpy(deepcopy(img_a.numpy()[:,:,::-1]))
-        #        img_p = torch.from_numpy(deepcopy(img_p.numpy()[:,:,::-1]))
-        #return image patches and class label
-
         return (img_a, img_p, label, uniqueFlag)
 
     def __len__(self):
@@ -363,7 +322,7 @@ def create_loaders(args , dataset_names):
         transformFlag = False
     train_loader = torch.utils.data.DataLoader(
             TripletPhotoTour(train=True,
-                             batch_size=args.batch_size,
+                             batch_size=int(args.batch_size / 2),
                              root=args.dataroot,
                              name=args.training_set,
                              fliprot = args.fliprot,
@@ -371,7 +330,7 @@ def create_loaders(args , dataset_names):
                              download=True,
                              transform=transform_train,
                              transformFlag = transformFlag,
-                             uniquePairs= args.uniquePairs),
+                             samplesPerClass= args.samplesPerClass),
                              batch_size=1,
                              shuffle=True, **kwargs)
 
@@ -385,8 +344,7 @@ def create_loaders(args , dataset_names):
                      n_triplets = args.n_triplets,
                      download=True,
                      transform=transform_test,
-                     transformFlag=transformFlag,
-                     uniquePairs = args.uniquePairs),
+                     transformFlag=transformFlag),
                         batch_size=args.test_batch_size,
                         shuffle=False, **kwargs)}
                     for name in test_dataset_names]
