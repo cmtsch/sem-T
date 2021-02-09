@@ -93,20 +93,20 @@ def infonce_loss(currSamples, currClasses, crossSamples, do_cross):
     p_mask = (p_mask.float() - diag_mask.float()).bool()
 
     sim_p = sim[p_mask].clone().unsqueeze(1)
-    print ("Size of sim_p is " + str(list(sim_p.size())))
+    #print ("Size of sim_p is " + str(list(sim_p.size())))
     # Flat tensor of size numClasses * (samplesPerClass^2 - samplesPerClass)
     # e.g. (1024 * (4-2)) = 2048 or (128 * (256-16)) = 30720
 
     # Negative similarities
     sim[p_mask] -= 10.  # mask out the positive samples by making them neglegible in the softmax
     sim_n = sim[torch.arange(0,n_samples).unsqueeze(1).repeat(1, n_samples)[p_mask]]
-    print("Size of sim_n is " + str(list(sim_n.size())))
+    #print("Size of sim_n is " + str(list(sim_n.size())))
     pred_lgt = torch.cat([sim_p, sim_n], dim=1)
 
     if do_cross:
         cross_sim = currSamples @ crossSamples.t()
         cross_sim_n = cross_sim[torch.arange(0,n_samples).unsqueeze(1).repeat(1, n_samples)[p_mask]]
-        print("Size of cross_sim_n is " + str(list(cross_sim_n.size())))
+        #print("Size of cross_sim_n is " + str(list(cross_sim_n.size())))
         pred_lgt = torch.cat([pred_lgt, cross_sim_n], dim=1)
 
     #Take the log_softmax of each row

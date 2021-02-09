@@ -78,31 +78,44 @@ def loss_TripletHiB( currSamples, currClasses, crossSamples, crossClasses, sampl
 
     class_mask = (currClasses[:, None] == currClasses[None, :]).float()
 
-    # batchSize x batchSize matrix with values in [0,1] the lower, the more similar, 0 on diagonal
     dist_matrix = distance_matrix_vector(currSamples, currSamples) + eps
 
     dist_matrix_mask_pos= dist_matrix + class_mask.type_as(dist_matrix) * 42
     dist_matrix_mask_neg= dist_matrix + (class_mask.type_as(dist_matrix) -1.0) * 42
 
-    # 1D tensors
-    all_positives = torch.max(dist_matrix_mask_neg, 0)[0]
-    all_negatives = torch.min(dist_matrix_mask_pos, 0)[0]
+    #hardest positives
+    all_positives = torch.max(dist_matrix_mask_neg, 1)[0]
+    #hardest negatives
+    all_negatives = torch.min(dist_matrix_mask_pos, 1)[0]
+    cross_chosen = 0
 
     if do_cross_batch:
         x_dist_matrix = distance_matrix_vector(currSamples, crossSamples) +eps
         cross_negatives = torch.min(x_dist_matrix,1)[0]
-        all_negatives = torch.min(all_negatives, cross_negatives)
+        helper = torch.cat ((all_negatives.unsqueeze(1), cross_negatives.unsqueeze(1)),1)
+        all_negatives, min_ind = torch.min(helper, 1)
+        cross_chosen = torch.sum(min_ind).item()
 
-    num_classes = int(batch_size / samplesPerClass)
-    class_positives = torch.zeros(num_classes).cuda()
-    class_negatives = torch.zeros(num_classes).cuda()
-    for i in range (num_classes):
-        class_positives[i] = torch.max(all_positives[i*samplesPerClass : (i+1)* samplesPerClass])
-        class_negatives[i] = torch.min(all_negatives[i*samplesPerClass : (i+1)* samplesPerClass])
+    do_reduction = False
 
-    margin = 1.0
-    loss = torch.mean(torch.clamp(margin + class_positives - class_negatives, min=0.0))
-    return loss
+    if do_reduction:
+        num_classes = int(batch_size / samplesPerClass)
+        class_positives = torch.zeros(num_classes).cuda()
+        class_negatives = torch.zeros(num_classes).cuda()
+        step = int(samplesPerClass /2 )
+        off = int(batch_size/2 )
+        # maybe a shortcut for samplesPerClass = 2?
+        for i in range (num_classes):
+            class_positives[i] = torch.max(torch.max(all_positives[i*step : (i+1)* step],all_positives[off+ i*step : off+(i+1)* step]))
+            class_negatives[i] = torch.min(torch.min(all_negatives[i*step : (i+1)* step], all_negatives[off+i*step: off+(i+1)*step]))
+
+        margin = 1.0
+        loss = torch.mean(torch.clamp(margin + class_positives - class_negatives, min=0.0))
+    else:
+        margin = 1.0
+        loss = torch.mean(torch.clamp(margin + all_positives - all_negatives, min=0.0))
+
+    return loss, cross_chosen
 
 def loss_ArcLength(currSamples, currClasses, crossSamples, crossClasses, doCross):
 

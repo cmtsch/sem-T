@@ -121,6 +121,8 @@ parser.add_argument('--HyperLoss', default= 'None',
 parser.add_argument('--lossSOS', type=str2bool, default=False, metavar='SOS',
                     help='use the Second Order Similarity loss')
 
+parser.add_argument('--adjLR', type=str2bool, default=True,
+                    help='Adjust the learning rate')
 parser.add_argument('--samplesPerClass', type=int, default=2,
                     help='Other options: 16, 64')
 parser.add_argument('--cross_batch', type=int, default=0,
@@ -159,6 +161,8 @@ if args.highDim:
     suffix = suffix + 'H'
 else:
     suffix = suffix + 'L'
+# X-batch (cross-batch memory information)
+suffix = suffix + 'X' + str(args.cross_batch)
 
 suffix = suffix + '_'
 suffix = suffix + args.MiLoss
@@ -200,6 +204,10 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
     pbar = tqdm(enumerate(train_loader))
 
     num_cross_batches = args.cross_batch
+
+    if epoch <3:
+        num_cross_batches = 0
+
     cross_flag = True
     if num_cross_batches == 0:
         cross_flag = False
@@ -240,20 +248,22 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
         loss_hyper = torch.tensor(0.0).cuda()
 
         currSamples= torch.cat((out_a, out_p),0)
-        currClasses = torch.cat((classes,classes),0)
-
+        currClasses = torch.cat((classes, classes),0)
 
 
         #Hanlde primary loss
+        start_loss = time.time()
         if args.PrimLoss == "Triplet":
-            loss_prim += loss_TripletHiB(currSamples,
+            help, cross_chosen = loss_TripletHiB(currSamples,
                                     currClasses,
                                     crossSamples,
                                     currClasses,
                                     args.samplesPerClass,
                                          cross_initialized)
+            loss_prim += help
         elif args.PrimLoss == "Positive":
              loss_prim += loss_OnlyPositive (currSamples, currClasses, args.samplesPerClass)
+        end_loss = time.time()
         #else:
             # if None do nothing
 
@@ -276,16 +286,19 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
         if args.lossSOS:
             loss_total += loss_SOS_new(currSamples,currClasses, crossSamples, crossClasses, cross_initialized)
 
+
         optimizer.zero_grad()
+        start_gradient = time.time()
         loss_total.backward()
+        end_gradient = time.time()
         optimizer.step()
-        adjust_learning_rate(optimizer)
+        if args.adjLR:
+            adjust_learning_rate(optimizer)
 
         # update cross memory samples
         if cross_flag:
             crossSamples[cross_ptr*batchSize: (cross_ptr+1)* batchSize, : ] = currSamples.detach()
-            #currClasses.requires_grad = False
-            crossClasses[cross_ptr*batchSize: (cross_ptr+1)* batchSize ] = currClasses
+            crossClasses[cross_ptr*batchSize: (cross_ptr+1)* batchSize ] = currClasses.detach()
             cross_ptr += 1
             if cross_ptr == num_cross_batches and not cross_initialized:
                 print ("Cross-batch activated")
@@ -293,12 +306,16 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
 
             cross_ptr = cross_ptr%num_cross_batches
 
+
         # Write Data for tensorboard visualization
         if batch_idx % args.log_interval == 0:
             writer.add_scalar('Loss/train_total', loss_total.item(), batch_idx + epoch*len(train_loader))
             writer.add_scalar('Loss/train_primary', loss_prim.item(), batch_idx + epoch*len(train_loader))
             writer.add_scalar('Loss/train_MI', loss_mi.item(), batch_idx + epoch*len(train_loader))
             writer.add_scalar('Loss/train_hyper', loss_hyper.item(), batch_idx + epoch*len(train_loader))
+            writer.add_scalar('Time/loss', end_loss - start_loss, batch_idx + epoch*len(train_loader))
+            writer.add_scalar('Time/gradient', end_gradient - start_gradient, batch_idx + epoch*len(train_loader))
+            writer.add_scalar('Time/cross_chosen', cross_chosen, batch_idx + epoch*len(train_loader))
             pbar.set_description(
                 'Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                     epoch, batch_idx * len(data_a), len(train_loader.dataset)*len(data_a),
@@ -369,7 +386,7 @@ def adjust_learning_rate(optimizer):
         else:
             group['step'] += 1.
         group['lr'] = args.lr * (
-        1.0 - float(group['step']) * float(args.batch_size) / (args.n_triplets * float(args.epochs)))
+        1.0 - float(group['step']) * float(args.batch_size/2) / (args.n_triplets * float(args.epochs)))
     return
 
 def create_optimizer(model, new_lr):
