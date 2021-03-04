@@ -3,6 +3,7 @@ import torch
 import torch.nn.init
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
+from torchvision.utils import save_image
 import numpy as np
 import random
 import copy
@@ -34,18 +35,24 @@ class TripletPhotoTour(dset.PhotoTour):
     def generate_triplets(labels, num_triplets, batch_size, samplesPerClass, data,transform, transformFlag):
 
 
-        def transform_img(img):
+        def transform_img(img, imgNum=0):
+
+
+            if not imgNum == 0:
+                print (img/255.0)
+                save_image(img/255.0, 'beforeNothing'+ str(imgNum) +'.png'  )
+
             img = img.numpy()
             if transformFlag:
                 if (random.random() < 0.3):
                     #stddev = np.random.uniform(5,95)
-                    stddev = np.random.uniform(5,30)
+                    stddev = np.random.uniform(3,5)
                     noise = np.random.normal(0., stddev, size=img.shape)
                     tmpImg = img.copy()
                     tmpImg = (tmpImg + noise)
                     img = tmpImg.clip(0.,255.).astype(np.uint8)
                 if (random.random() < 0.3):
-                    strength = np.random.uniform(0.8,1.2)
+                    strength = np.random.uniform(0.95,1.05)
                     contrasted_img = img.copy()
                     mean = np.mean(contrasted_img)
                     contrasted_img = (contrasted_img-mean) * strength + mean
@@ -57,6 +64,10 @@ class TripletPhotoTour(dset.PhotoTour):
             else:
                 #Just apply the normal transformation
                 img = transform(img)
+
+            if not imgNum == 0:
+                save_image(img, 'afterNothing_' + str(imgNum) +'.png')
+
             return img
 
         def create_indices(_labels):
@@ -146,6 +157,9 @@ class TripletPhotoTour(dset.PhotoTour):
             return batch1, batch2, classes
 
         def nonUniqueBatch(samplesPerClass):
+
+            saveCtr = 0
+
             batchCtr=0
             batch1 = torch.empty(batch_size, 1, 32, 32)
             batch2 = torch.empty(batch_size, 1, 32, 32)
@@ -166,8 +180,10 @@ class TripletPhotoTour(dset.PhotoTour):
                     for n2 in range (n1+1, len(indices[c])):
                         # Here we do not necessarily need to transform, could just use original patches
                         if classCtr < samplesPerClass:
-                            tmpPathc = transform_img(data[indices[c][n1]])
-                            #print (tmpPathc.size())
+
+                            if (random.random() < 0.01):
+                                transform_img(data[indices[c][n2]], saveCtr)
+                                saveCtr+= 1
                             batch1[batchCtr,:,:,:] = transform_img(data[indices[c][n1]])
                             batch2[batchCtr,:, :, :] = transform_img(data[indices[c][n2]])
                             classes[batchCtr] = c

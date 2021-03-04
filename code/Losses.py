@@ -90,14 +90,27 @@ def loss_TripletHiB( currSamples, currClasses, crossSamples, crossClasses, sampl
     cross_chosen = 0
 
     if do_cross_batch:
+        cross_mask = (currClasses[:, None] == crossClasses[None, :]).float()
         x_dist_matrix = distance_matrix_vector(currSamples, crossSamples) +eps
-        cross_negatives = torch.min(x_dist_matrix,1)[0]
+        x_dist_matrix_masked = x_dist_matrix + cross_mask.type_as(x_dist_matrix) * 42
+
+        cross_negatives = torch.min(x_dist_matrix_masked,1)[0]
         helper = torch.cat ((all_negatives.unsqueeze(1), cross_negatives.unsqueeze(1)),1)
+        #print(helper)
         all_negatives, min_ind = torch.min(helper, 1)
+        #print (all_negatives.size())
         cross_chosen = torch.sum(min_ind).item()
 
-    do_reduction = False
 
+    #print (all_negatives)
+    negative_mean = torch.mean(all_negatives)
+    #print (negative_mean)
+
+    #print (all_positives)
+    positive_mean = torch.mean(all_positives)
+    #print (positive_mean)
+
+    do_reduction = False
     if do_reduction:
         num_classes = int(batch_size / samplesPerClass)
         class_positives = torch.zeros(num_classes).cuda()
@@ -115,21 +128,22 @@ def loss_TripletHiB( currSamples, currClasses, crossSamples, crossClasses, sampl
         margin = 1.0
         loss = torch.mean(torch.clamp(margin + all_positives - all_negatives, min=0.0))
 
-    return loss, cross_chosen
+    return loss, cross_chosen, positive_mean, negative_mean
 
 def loss_ArcLength(currSamples, currClasses, crossSamples, crossClasses, doCross):
 
     #Calculate all class means
-    means = torch.empty([currClasses.size(), 128])
     allClasses = torch.unique(currClasses)
+    means = torch.empty([allClasses.size()[0], 128]).cuda()
     idx = 0
 
     for label in allClasses:
         means[idx]= torch.mean(currSamples[ currClasses == label, :], dim=0)
+        idx += 1
 
     if doCross:
         cross_allClasses = torch.unique(currClasses)
-        cross_means = torch.empty([crossClasses.size(), 128])
+        cross_means = torch.empty([crossClasses.size()[0], 128])
         idx = 0
         for label in cross_allClasses:
             cross_means[idx] = torch.mean(crossSamples[crossClasses == label, :], dim=0)
@@ -138,7 +152,7 @@ def loss_ArcLength(currSamples, currClasses, crossSamples, crossClasses, doCross
 
     inner_prod = means @ means.t()
     eps = 1e-8
-    arc_lenghts = torch.pow(torch.arccos(inner_prod+eps), -1)
+    arc_lenghts = torch.pow(torch.acos(inner_prod+eps), -1)
 
     # somehow normalize by multiplying with number of clusters
     loss = torch.mean(arc_lenghts) * arc_lenghts.size()[0]
@@ -147,16 +161,17 @@ def loss_ArcLength(currSamples, currClasses, crossSamples, crossClasses, doCross
 def loss_MaxMean(currSamples, currClasses, crossSamples, crossClasses, doCross):
 
     #Calculate all class means
-    means = torch.empty([currClasses.size(), 128])
     allClasses = torch.unique(currClasses)
+    means = torch.empty([allClasses.size()[0], 128]).cuda()
     idx = 0
 
     for label in allClasses:
         means[idx]= torch.mean(currSamples[ currClasses == label, :], dim=0)
+        idx += 1
 
     if doCross:
         cross_allClasses = torch.unique(currClasses)
-        cross_means = torch.empty([crossClasses.size(), 128])
+        cross_means = torch.empty([crossClasses.size()[0], 128])
         idx = 0
         for label in cross_allClasses:
             cross_means[idx] = torch.mean(crossSamples[crossClasses == label, :], dim=0)

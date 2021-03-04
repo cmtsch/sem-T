@@ -254,10 +254,10 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
         #Hanlde primary loss
         start_loss = time.time()
         if args.PrimLoss == "Triplet":
-            help, cross_chosen = loss_TripletHiB(currSamples,
+            help, cross_chosen, positive_mean, negative_mean = loss_TripletHiB(currSamples,
                                     currClasses,
                                     crossSamples,
-                                    currClasses,
+                                    crossClasses,
                                     args.samplesPerClass,
                                          cross_initialized)
             loss_prim += help
@@ -275,9 +275,9 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
 
         if args.HyperLoss == 'Rho':
             loss_hyper += loss_Rho(currSamples, currClasses, crossSamples, crossClasses, cross_initialized)
-        elif args.PrimLoss == "ArcLength":
+        elif args.HyperLoss == "ArcLength":
             loss_hyper += loss_ArcLength(currSamples, currClasses, crossSamples, crossClasses, cross_initialized)
-        elif args.PrimLoss == "MaxMean":
+        elif args.HyperLoss == "MaxMean":
             loss_hyper += loss_MaxMean(currSamples, currClasses, crossSamples, crossClasses, cross_initialized)
 
         loss_total =loss_prim + loss_mi + loss_hyper
@@ -292,13 +292,17 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
         loss_total.backward()
         end_gradient = time.time()
         optimizer.step()
-        if args.adjLR:
+        if args.adjLR and args.optimizer == 'sgd':
             adjust_learning_rate(optimizer)
 
         # update cross memory samples
         if cross_flag:
-            crossSamples[cross_ptr*batchSize: (cross_ptr+1)* batchSize, : ] = currSamples.detach()
-            crossClasses[cross_ptr*batchSize: (cross_ptr+1)* batchSize ] = currClasses.detach()
+            tmp = currSamples.detach()
+            tmp.requires_grad = False
+            crossSamples[cross_ptr*batchSize: (cross_ptr+1)* batchSize, : ] =tmp
+            tmp = currClasses.detach()
+            tmp.requires_grad = False
+            crossClasses[cross_ptr*batchSize: (cross_ptr+1)* batchSize ] = tmp
             cross_ptr += 1
             if cross_ptr == num_cross_batches and not cross_initialized:
                 print ("Cross-batch activated")
@@ -316,6 +320,8 @@ def train(train_loader, model, optimizer, epoch, logger, load_triplets  = False)
             writer.add_scalar('Time/loss', end_loss - start_loss, batch_idx + epoch*len(train_loader))
             writer.add_scalar('Time/gradient', end_gradient - start_gradient, batch_idx + epoch*len(train_loader))
             writer.add_scalar('Time/cross_chosen', cross_chosen, batch_idx + epoch*len(train_loader))
+            writer.add_scalar('Time/positive_mean', positive_mean.item(), batch_idx + epoch*len(train_loader))
+            writer.add_scalar('Time/negative_mean', negative_mean.item(), batch_idx + epoch*len(train_loader))
             pbar.set_description(
                 'Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                     epoch, batch_idx * len(data_a), len(train_loader.dataset)*len(data_a),
@@ -396,8 +402,8 @@ def create_optimizer(model, new_lr):
                               momentum=0.9, dampening=0.9,
                               weight_decay=args.wd)
     elif args.optimizer == 'adam':
-        optimizer = optim.Adam(model.parameters(), lr=new_lr,
-                               weight_decay=args.wd)
+        optimizer = optim.Adam(model.parameters(), lr=0.01,
+                               weight_decay=0.0)
     else:
         raise Exception('Not supported optimizer: {0}'.format(args.optimizer))
     return optimizer
